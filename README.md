@@ -2,6 +2,11 @@
 
 Una plataforma web completa e interactiva dedicada a la preservación, difusión y enseñanza de las danzas folklóricas argentinas. Construida con amor por la tradición y la educación cultural.
 
+## 🌐 Sitio en vivo
+
+- **Frontend (GitHub Pages)**: https://devsael.github.io/danzas-folkloricas-argentinas/
+- **Panel de administración**: agregá `/admin.html` a la URL del sitio
+
 ## 📋 Contenidos
 
 - [Características](#características)
