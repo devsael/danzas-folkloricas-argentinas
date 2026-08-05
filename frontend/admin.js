@@ -2,7 +2,7 @@
 // CONFIGURACIÓN
 // ============================================
 // IMPORTANTE: debe ser la MISMA URL que usás en script.js
-const API_URL = 'http://localhost:3000'; // Cambiar cuando despliegues a producción
+const API_URL = 'https://danzas-folkloricas-api.onrender.com'; // Backend en Render
 
 // ============================================
 // CLAVE DE ADMINISTRADOR

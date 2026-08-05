@@ -3,7 +3,7 @@
 // ============================================
 
 // Cambiar esta URL según dónde esté desplegado el backend
-const API_URL = 'http://localhost:3000'; // Cambiar cuando despliegues en Render
+const API_URL = 'https://danzas-folkloricas-api.onrender.com'; // Backend en Render
 
 // ============================================
 // PORTADA DE FONDO
