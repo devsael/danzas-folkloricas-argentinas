@@ -16,7 +16,7 @@ if (!process.env.ADMIN_KEY) {
 
 // Middleware
 app.use(cors({
-  origin: ['http://localhost:3000', 'http://127.0.0.1:3000', 'http://localhost:8000', 'http://127.0.0.1:8000', 'https://tu-usuario.github.io'],
+  origin: ['http://localhost:3000', 'http://127.0.0.1:3000', 'http://localhost:8000', 'http://127.0.0.1:8000', 'https://devsael.github.io'],
   credentials: true
 }));
 app.use(bodyParser.json());

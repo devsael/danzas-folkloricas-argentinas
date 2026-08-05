@@ -1,0 +1,11 @@
+{
+  "name": "danzas-folkloricas-argentinas",
+  "version": "1.0.0",
+  "description": "Plataforma educativa de danzas folklóricas argentinas",
+  "private": true,
+  "scripts": {
+    "start": "cd backend && npm start",
+    "dev": "cd backend && npm run dev",
+    "init-db": "cd backend && npm run init-db"
+  }
+}
