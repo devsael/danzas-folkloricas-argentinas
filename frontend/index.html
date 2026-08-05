@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Plataforma educativa sobre danzas folklóricas argentinas">
+    <meta name="author" content="Efra - Instructor de Danzas Folklóricas">
+    <title>Danzas Folklóricas Argentinas</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- NAVEGACIÓN -->
+    <nav class="navbar" id="navbar">
+        <div class="container">
+            <div class="nav-brand">
+                <h1>Danzas Folklóricas Argentinas</h1>
+            </div>
+            <ul class="nav-menu">
+                <li><a href="#inicio" class="nav-link active">Inicio</a></li>
+                <li><a href="#plan-estudio" class="nav-link">Plan de Estudio</a></li>
+                <li><a href="#danzas" class="nav-link">Danzas</a></li>
+                <li><a href="#eventos" class="nav-link">Eventos</a></li>
+                <li><a href="#comentarios" class="nav-link">Libro de Visitas</a></li>
+            </ul>
+            <button class="menu-toggle" id="menuToggle">☰</button>
+        </div>
+    </nav>
+
+    <!-- HERO SECTION -->
+    <section id="inicio" class="hero">
+        <div class="hero-content">
+            <span class="hero-eyebrow">Tradición · Cultura · Identidad</span>
+            <h2>Bienvenido al Mundo de las <span class="hero-highlight">Danzas Folklóricas</span> Argentinas</h2>
+            <p>Descubre la riqueza cultural, la historia y la belleza de nuestras danzas tradicionales</p>
+            <p class="hero-subtitle">Desde el Noroeste andino hasta la Mesopotamia, conocé el patrimonio danzario de Argentina</p>
+            <div class="hero-ctas">
+                <button class="cta-button" onclick="document.getElementById('danzas').scrollIntoView({behavior: 'smooth'})">
+                    Explorar Danzas
+                </button>
+                <a href="#plan-estudio" class="cta-button cta-outline">Ver Plan de Estudio</a>
+            </div>
+        </div>
+        <a href="#plan-estudio" class="hero-scroll" aria-label="Bajar al contenido">▾</a>
+    </section>
+
+    <!-- SECCIÓN: PLAN DE ESTUDIO -->
+    <section id="plan-estudio" class="plan-estudio">
+        <div class="container">
+            <h2 class="section-title">📚 Plan de Estudio</h2>
+            <p class="section-subtitle">Ruta estructurada para aprender danzas folklóricas argentinas</p>
+            
+            <div class="niveles">
+                <!-- NIVEL INICIAL -->
+                <div class="nivel-card">
+                    <div class="nivel-header">
+                        <h3>Nivel Inicial</h3>
+                        <span class="duracion">3-4 meses</span>
+                    </div>
+                    <div class="nivel-content">
+                        <ul>
+                            <li>✓ Introducción a las danzas folklóricas argentinas</li>
+                            <li>✓ Historia y regiones de origen</li>
+                            <li>✓ Técnica básica y coordinación</li>
+                            <li>✓ Chacarera simplificada</li>
+                            <li>✓ Gato elemental</li>
+                            <li>✓ Zamba: primeros pasos</li>
+                            <li>✓ Palmas y ritmo básico</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- NIVEL INTERMEDIO -->
+                <div class="nivel-card">
+                    <div class="nivel-header">
+                        <h3>Nivel Intermedio</h3>
+                        <span class="duracion">4-5 meses</span>
+                    </div>
+                    <div class="nivel-content">
+                        <ul>
+                            <li>✓ Dominio de Chacarera completa</li>
+                            <li>✓ Gato con complejidad rítmica</li>
+                            <li>✓ Zamba romántica y expresiva</li>
+                            <li>✓ Introducción a Chamamé</li>
+                            <li>✓ Cueca básica</li>
+                            <li>✓ Combinación de danzas</li>
+                            <li>✓ Interpretación y estilo personal</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- NIVEL AVANZADO -->
+                <div class="nivel-card">
+                    <div class="nivel-header">
+                        <h3>Nivel Avanzado</h3>
+                        <span class="duracion">5-6 meses</span>
+                    </div>
+                    <div class="nivel-content">
+                        <ul>
+                            <li>✓ Dominio total de todas las danzas</li>
+                            <li>✓ Tango folklórico (conexión con la historia)</li>
+                            <li>✓ Chamamé avanzado</li>
+                            <li>✓ Creación de coreografías propias</li>
+                            <li>✓ Pedagogía de danzas folklóricas</li>
+                            <li>✓ Capacidad de enseñanza</li>
+                            <li>✓ Presentaciones públicas y eventos</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="observaciones">
+                <p>💡 <strong>Nota:</strong> El tiempo de avance depende de la dedicación personal. Los talleres se adaptan al ritmo de aprendizaje de cada grupo. La práctica constante es fundamental.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- SECCIÓN: DANZAS -->
+    <section id="danzas" class="danzas-section">
+        <div class="container">
+            <h2 class="section-title">💃 Danzas Folklóricas</h2>
+            <p class="section-subtitle">Conocé la historia, técnica y belleza de cada danza</p>
+
+            <div class="danzas-buscador">
+                <input type="text" id="danzas-busqueda" placeholder="🔍 Buscar danza por nombre..." autocomplete="off">
+            </div>
+
+            <div id="danzas-lista" class="danzas-grid">
+                <div class="loading">Cargando danzas...</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- SECCIÓN: EVENTOS -->
+    <section id="eventos" class="eventos-section">
+        <div class="container">
+            <h2 class="section-title">📅 Eventos y Peñas</h2>
+            <p class="section-subtitle">Próximas actividades culturales y talleres</p>
+            
+            <div id="eventos-lista" class="eventos-grid">
+                <div class="loading">Cargando eventos...</div>
+            </div>
+
+            <div class="crear-evento">
+                <h3>¿Querés organizar un evento?</h3>
+                <p>Si representas una institución o grupo cultural, contactanos para agregar tu evento</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- SECCIÓN: COMENTARIOS / LIBRO DE VISITAS -->
+    <section id="comentarios" class="comentarios-section">
+        <div class="container">
+            <h2 class="section-title">📖 Libro de Visitas</h2>
+            <p class="section-subtitle">Compartí tu experiencia y mensajes con la comunidad</p>
+            
+            <!-- Formulario para agregar comentarios -->
+            <div class="formulario-comentario">
+                <h3>Dejá tu mensaje</h3>
+                <form id="form-comentario" class="form">
+                    <div class="form-group">
+                        <label for="nombre">Tu nombre:</label>
+                        <input type="text" id="nombre" name="nombre" placeholder="Tu nombre" maxlength="100" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="mensaje">Tu mensaje:</label>
+                        <textarea id="mensaje" name="mensaje" placeholder="¿Qué te pareció? ¿Qué te llevás de acá?" maxlength="1000" rows="4" required></textarea>
+                    </div>
+                    <button type="submit" class="submit-button">Enviar Mensaje</button>
+                    <div id="form-status" class="form-status"></div>
+                </form>
+            </div>
+
+            <!-- Lista de comentarios -->
+            <div class="comentarios-lista">
+                <h3>Mensajes de la comunidad</h3>
+                <div id="comentarios-grid" class="comments-grid">
+                    <div class="loading">Cargando comentarios...</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- MODAL PARA VER DETALLES DE DANZA -->
+    <div id="modal-danza" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <div class="modal-body">
+                <h2 id="modal-titulo"></h2>
+                <div class="modal-info">
+                    <div class="info-item">
+                        <strong>Región:</strong> <span id="modal-region"></span>
+                    </div>
+                </div>
+                <div class="modal-section">
+                    <h3>Historia</h3>
+                    <p id="modal-historia"></p>
+                </div>
+                <div class="modal-section">
+                    <h3>Coreografía Básica</h3>
+                    <p id="modal-coreografia"></p>
+                </div>
+                <div class="modal-section" id="video-section" style="display: none;">
+                    <h3>Video Tutorial</h3>
+                    <div id="modal-video"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- FOOTER -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h4>Sobre Este Sitio</h4>
+                    <p>Plataforma educativa dedicada a la preservación y difusión de las danzas folklóricas argentinas.</p>
+                </div>
+                <div class="footer-section">
+                    <h4>Enlaces Útiles</h4>
+                    <ul>
+                        <li><a href="#inicio">Inicio</a></li>
+                        <li><a href="#plan-estudio">Plan de Estudio</a></li>
+                        <li><a href="#danzas">Danzas</a></li>
+                        <li><a href="#eventos">Eventos</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4>Contacto</h4>
+                    <p>Instructor de Danzas Folklóricas Argentinas</p>
+                    <p>San Miguel, Corrientes, Argentina</p>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2025 Danzas Folklóricas Argentinas | Desarrollado con ❤️ y pasión por la tradición</p>
+                <p>API Status: <span id="api-status" class="status-badge">Verificando...</span></p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>

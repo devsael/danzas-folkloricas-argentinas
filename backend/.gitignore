@@ -1,0 +1,4 @@
+node_modules/
+.env
+danzas.db
+npm-debug.log
