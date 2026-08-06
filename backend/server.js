@@ -1,8 +1,8 @@
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
-const sqlite3 = require('sqlite3').verbose();
-const path = require('path');
+const db = require('./db');
+const ddl = require('./ddl');
 require('dotenv').config();
 
 const app = express();
@@ -21,51 +21,20 @@ app.use(cors({
 }));
 app.use(bodyParser.json());
 
-// Conexión a SQLite
-const dbPath = path.join(__dirname, 'danzas.db');
-const db = new sqlite3.Database(dbPath, (err) => {
-  if (err) {
-    console.error('Error al conectar con la base de datos:', err);
+// ============= MIGRACIONES =============
+
+// Asegura que una columna exista (funciona con SQLite y PostgreSQL)
+async function ensureColumn(table, column, definition) {
+  if (db.isPostgres) {
+    await db.run(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS ${column} ${definition}`);
   } else {
-    console.log('✓ Conectado a SQLite en:', dbPath);
-    // Migración: asegurar columna "estado" en comentarios (moderación)
-    db.all("PRAGMA table_info(comentarios)", (pragmaErr, columnas) => {
-      if (pragmaErr) return;
-      const cols = Array.isArray(columnas) ? columnas : [];
-      if (!cols.some(c => c.name === 'estado')) {
-        db.run("ALTER TABLE comentarios ADD COLUMN estado TEXT NOT NULL DEFAULT 'aprobado'", (alterErr) => {
-          if (alterErr) {
-            console.error('Error al migrar tabla comentarios:', alterErr.message);
-          } else {
-            console.log('✓ Columna "estado" agregada a comentarios (migración)');
-          }
-        });
-      }
-    });
+    const columns = await db.all(`PRAGMA table_info(${table})`);
+    if (!columns.some(c => c.name === column)) {
+      await db.run(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+      console.log(`✓ Columna "${column}" agregada a ${table}`);
+    }
   }
-});
-
-// Promisificar las operaciones de base de datos
-const dbRun = (sql, params = []) => new Promise((resolve, reject) => {
-  db.run(sql, params, function(err) {
-    if (err) reject(err);
-    else resolve(this);
-  });
-});
-
-const dbAll = (sql, params = []) => new Promise((resolve, reject) => {
-  db.all(sql, params, (err, rows) => {
-    if (err) reject(err);
-    else resolve(rows);
-  });
-});
-
-const dbGet = (sql, params = []) => new Promise((resolve, reject) => {
-  db.get(sql, params, (err, row) => {
-    if (err) reject(err);
-    else resolve(row);
-  });
-});
+}
 
 // ============= AUTENTICACIÓN =============
 
@@ -80,6 +49,19 @@ function requireAdminKey(req, res, next) {
   next();
 }
 
+// ============= UTILIDADES =============
+
+function getPagination(req, defLimit = 10, maxLimit = 50) {
+  const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+  const limit = Math.min(maxLimit, Math.max(1, parseInt(req.query.limit, 10) || defLimit));
+  const offset = (page - 1) * limit;
+  return { page, limit, offset };
+}
+
+function paginacionRespuesta(total, page, limit) {
+  return { page, limit, total, totalPages: Math.ceil(total / limit) };
+}
+
 // ============= RUTAS =============
 
 // Health check
@@ -89,11 +71,30 @@ app.get('/api/health', (req, res) => {
 
 // ===== DANZAS =====
 
-// GET /api/danzas - Listar todas las danzas (ordenadas alfabéticamente)
+// GET /api/danzas - Listar danzas con paginación y búsqueda opcional
+//   ?search=termino&page=1&limit=12
 app.get('/api/danzas', async (req, res) => {
   try {
-    const danzas = await dbAll('SELECT * FROM danzas ORDER BY nombre COLLATE NOCASE ASC');
-    res.json({ success: true, data: danzas });
+    const search = (req.query.search || '').trim();
+    const { page, limit, offset } = getPagination(req, 12, 50);
+
+    const op = db.isPostgres ? 'ILIKE' : 'LIKE';
+    const where = search ? `WHERE nombre ${op} ?` : '';
+    const params = search ? [`%${search}%`] : [];
+
+    const countRow = await db.get(`SELECT COUNT(*) AS total FROM danzas ${where}`, params);
+    const total = countRow ? countRow.total : 0;
+
+    const danzas = await db.all(
+      `SELECT * FROM danzas ${where} ORDER BY lower(nombre) ASC LIMIT ? OFFSET ?`,
+      [...params, limit, offset]
+    );
+
+    res.json({
+      success: true,
+      data: danzas,
+      pagination: paginacionRespuesta(total, page, limit)
+    });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
@@ -102,7 +103,7 @@ app.get('/api/danzas', async (req, res) => {
 // GET /api/danzas/:id - Obtener una danza específica
 app.get('/api/danzas/:id', async (req, res) => {
   try {
-    const danza = await dbGet('SELECT * FROM danzas WHERE id = ?', [req.params.id]);
+    const danza = await db.get('SELECT * FROM danzas WHERE id = ?', [req.params.id]);
     if (!danza) {
       return res.status(404).json({ success: false, error: 'Danza no encontrada' });
     }
@@ -115,21 +116,21 @@ app.get('/api/danzas/:id', async (req, res) => {
 // POST /api/danzas - Crear una nueva danza (solo para admin)
 app.post('/api/danzas', requireAdminKey, async (req, res) => {
   try {
-    const { nombre, region, historia, coreografia, video_url } = req.body;
+    const { nombre, region, caracter, historia, coreografia, video_url } = req.body;
     
     // Validaciones
     if (!nombre || !region) {
       return res.status(400).json({ success: false, error: 'Nombre y región son obligatorios' });
     }
     
-    const result = await dbRun(
-      'INSERT INTO danzas (nombre, region, historia, coreografia, video_url) VALUES (?, ?, ?, ?, ?)',
-      [nombre, region, historia || '', coreografia || '', video_url || '']
+    const result = await db.run(
+      'INSERT INTO danzas (nombre, region, caracter, historia, coreografia, video_url) VALUES (?, ?, ?, ?, ?, ?)',
+      [nombre, region, caracter || 'festiva', historia || '', coreografia || '', video_url || '']
     );
     
     res.status(201).json({ 
       success: true, 
-      data: { id: result.lastID, nombre, region, historia, coreografia, video_url }
+      data: { id: result.lastID, nombre, region, caracter: caracter || 'festiva', historia, coreografia, video_url }
     });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -139,26 +140,26 @@ app.post('/api/danzas', requireAdminKey, async (req, res) => {
 // PUT /api/danzas/:id - Editar una danza existente (solo para admin)
 app.put('/api/danzas/:id', requireAdminKey, async (req, res) => {
   try {
-    const { nombre, region, historia, coreografia, video_url } = req.body;
+    const { nombre, region, caracter, historia, coreografia, video_url } = req.body;
 
     // Validaciones
     if (!nombre || !region) {
       return res.status(400).json({ success: false, error: 'Nombre y región son obligatorios' });
     }
 
-    const existente = await dbGet('SELECT * FROM danzas WHERE id = ?', [req.params.id]);
+    const existente = await db.get('SELECT * FROM danzas WHERE id = ?', [req.params.id]);
     if (!existente) {
       return res.status(404).json({ success: false, error: 'Danza no encontrada' });
     }
 
-    await dbRun(
-      'UPDATE danzas SET nombre = ?, region = ?, historia = ?, coreografia = ?, video_url = ? WHERE id = ?',
-      [nombre, region, historia || '', coreografia || '', video_url || '', req.params.id]
+    await db.run(
+      'UPDATE danzas SET nombre = ?, region = ?, caracter = ?, historia = ?, coreografia = ?, video_url = ? WHERE id = ?',
+      [nombre, region, caracter || 'festiva', historia || '', coreografia || '', video_url || '', req.params.id]
     );
 
     res.json({
       success: true,
-      data: { id: Number(req.params.id), nombre, region, historia, coreografia, video_url }
+      data: { id: Number(req.params.id), nombre, region, caracter: caracter || 'festiva', historia, coreografia, video_url }
     });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -168,12 +169,12 @@ app.put('/api/danzas/:id', requireAdminKey, async (req, res) => {
 // DELETE /api/danzas/:id - Eliminar una danza (solo para admin)
 app.delete('/api/danzas/:id', requireAdminKey, async (req, res) => {
   try {
-    const existente = await dbGet('SELECT * FROM danzas WHERE id = ?', [req.params.id]);
+    const existente = await db.get('SELECT * FROM danzas WHERE id = ?', [req.params.id]);
     if (!existente) {
       return res.status(404).json({ success: false, error: 'Danza no encontrada' });
     }
 
-    await dbRun('DELETE FROM danzas WHERE id = ?', [req.params.id]);
+    await db.run('DELETE FROM danzas WHERE id = ?', [req.params.id]);
     res.json({ success: true, data: { id: Number(req.params.id) } });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -182,11 +183,25 @@ app.delete('/api/danzas/:id', requireAdminKey, async (req, res) => {
 
 // ===== EVENTOS =====
 
-// GET /api/eventos - Listar todos los eventos
+// GET /api/eventos - Listar eventos con paginación
+//   ?page=1&limit=6
 app.get('/api/eventos', async (req, res) => {
   try {
-    const eventos = await dbAll('SELECT * FROM eventos ORDER BY fecha DESC');
-    res.json({ success: true, data: eventos });
+    const { page, limit, offset } = getPagination(req, 6, 50);
+
+    const countRow = await db.get('SELECT COUNT(*) AS total FROM eventos');
+    const total = countRow ? countRow.total : 0;
+
+    const eventos = await db.all(
+      'SELECT * FROM eventos ORDER BY fecha DESC LIMIT ? OFFSET ?',
+      [limit, offset]
+    );
+
+    res.json({
+      success: true,
+      data: eventos,
+      pagination: paginacionRespuesta(total, page, limit)
+    });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
@@ -207,7 +222,7 @@ app.post('/api/eventos', requireAdminKey, async (req, res) => {
       return res.status(400).json({ success: false, error: 'Formato de fecha incorrecto (use YYYY-MM-DD)' });
     }
     
-    const result = await dbRun(
+    const result = await db.run(
       'INSERT INTO eventos (titulo, fecha, lugar, descripcion) VALUES (?, ?, ?, ?)',
       [titulo, fecha, lugar || '', descripcion || '']
     );
@@ -235,12 +250,12 @@ app.put('/api/eventos/:id', requireAdminKey, async (req, res) => {
       return res.status(400).json({ success: false, error: 'Formato de fecha incorrecto (use YYYY-MM-DD)' });
     }
 
-    const existente = await dbGet('SELECT * FROM eventos WHERE id = ?', [req.params.id]);
+    const existente = await db.get('SELECT * FROM eventos WHERE id = ?', [req.params.id]);
     if (!existente) {
       return res.status(404).json({ success: false, error: 'Evento no encontrado' });
     }
 
-    await dbRun(
+    await db.run(
       'UPDATE eventos SET titulo = ?, fecha = ?, lugar = ?, descripcion = ? WHERE id = ?',
       [titulo, fecha, lugar || '', descripcion || '', req.params.id]
     );
@@ -257,12 +272,12 @@ app.put('/api/eventos/:id', requireAdminKey, async (req, res) => {
 // DELETE /api/eventos/:id - Eliminar un evento (solo para admin)
 app.delete('/api/eventos/:id', requireAdminKey, async (req, res) => {
   try {
-    const existente = await dbGet('SELECT * FROM eventos WHERE id = ?', [req.params.id]);
+    const existente = await db.get('SELECT * FROM eventos WHERE id = ?', [req.params.id]);
     if (!existente) {
       return res.status(404).json({ success: false, error: 'Evento no encontrado' });
     }
 
-    await dbRun('DELETE FROM eventos WHERE id = ?', [req.params.id]);
+    await db.run('DELETE FROM eventos WHERE id = ?', [req.params.id]);
     res.json({ success: true, data: { id: Number(req.params.id) } });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -271,13 +286,25 @@ app.delete('/api/eventos/:id', requireAdminKey, async (req, res) => {
 
 // ===== COMENTARIOS =====
 
-// GET /api/comentarios - Listar comentarios aprobados (público, últimos 50)
+// GET /api/comentarios - Comentarios aprobados (público) con paginación
+//   ?page=1&limit=10
 app.get('/api/comentarios', async (req, res) => {
   try {
-    const comentarios = await dbAll(
-      "SELECT * FROM comentarios WHERE estado = 'aprobado' ORDER BY fecha DESC LIMIT 50"
+    const { page, limit, offset } = getPagination(req, 10, 50);
+
+    const countRow = await db.get("SELECT COUNT(*) AS total FROM comentarios WHERE estado = 'aprobado'");
+    const total = countRow ? countRow.total : 0;
+
+    const comentarios = await db.all(
+      "SELECT * FROM comentarios WHERE estado = 'aprobado' ORDER BY fecha DESC LIMIT ? OFFSET ?",
+      [limit, offset]
     );
-    res.json({ success: true, data: comentarios });
+
+    res.json({
+      success: true,
+      data: comentarios,
+      pagination: paginacionRespuesta(total, page, limit)
+    });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
@@ -286,7 +313,7 @@ app.get('/api/comentarios', async (req, res) => {
 // GET /api/comentarios/pendientes - Comentarios esperando moderación (solo admin)
 app.get('/api/comentarios/pendientes', requireAdminKey, async (req, res) => {
   try {
-    const comentarios = await dbAll(
+    const comentarios = await db.all(
       "SELECT * FROM comentarios WHERE estado = 'pendiente' ORDER BY fecha ASC"
     );
     res.json({ success: true, data: comentarios });
@@ -298,7 +325,7 @@ app.get('/api/comentarios/pendientes', requireAdminKey, async (req, res) => {
 // GET /api/comentarios/rechazados - Comentarios rechazados (solo admin)
 app.get('/api/comentarios/rechazados', requireAdminKey, async (req, res) => {
   try {
-    const comentarios = await dbAll(
+    const comentarios = await db.all(
       "SELECT * FROM comentarios WHERE estado = 'rechazado' ORDER BY fecha DESC LIMIT 50"
     );
     res.json({ success: true, data: comentarios });
@@ -307,13 +334,23 @@ app.get('/api/comentarios/rechazados', requireAdminKey, async (req, res) => {
   }
 });
 
-// GET /api/comentarios/aprobados - Comentarios publicados (solo admin, para moderar o eliminar)
+// GET /api/comentarios/aprobados - Comentarios publicados (solo admin)
 app.get('/api/comentarios/aprobados', requireAdminKey, async (req, res) => {
   try {
-    const comentarios = await dbAll(
-      "SELECT * FROM comentarios WHERE estado = 'aprobado' ORDER BY fecha DESC LIMIT 100"
+    const { page, limit, offset } = getPagination(req, 10, 100);
+    const countRow = await db.get("SELECT COUNT(*) AS total FROM comentarios WHERE estado = 'aprobado'");
+    const total = countRow ? countRow.total : 0;
+
+    const comentarios = await db.all(
+      "SELECT * FROM comentarios WHERE estado = 'aprobado' ORDER BY fecha DESC LIMIT ? OFFSET ?",
+      [limit, offset]
     );
-    res.json({ success: true, data: comentarios });
+
+    res.json({
+      success: true,
+      data: comentarios,
+      pagination: paginacionRespuesta(total, page, limit)
+    });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
@@ -328,12 +365,12 @@ app.put('/api/comentarios/:id/estado', requireAdminKey, async (req, res) => {
       return res.status(400).json({ success: false, error: "Estado inválido (use 'aprobado' o 'rechazado')" });
     }
 
-    const existente = await dbGet('SELECT * FROM comentarios WHERE id = ?', [req.params.id]);
+    const existente = await db.get('SELECT * FROM comentarios WHERE id = ?', [req.params.id]);
     if (!existente) {
       return res.status(404).json({ success: false, error: 'Comentario no encontrado' });
     }
 
-    await dbRun('UPDATE comentarios SET estado = ? WHERE id = ?', [estado, req.params.id]);
+    await db.run('UPDATE comentarios SET estado = ? WHERE id = ?', [estado, req.params.id]);
     res.json({ success: true, data: { id: Number(req.params.id), estado } });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -343,12 +380,12 @@ app.put('/api/comentarios/:id/estado', requireAdminKey, async (req, res) => {
 // DELETE /api/comentarios/:id - Eliminar un comentario (solo admin)
 app.delete('/api/comentarios/:id', requireAdminKey, async (req, res) => {
   try {
-    const existente = await dbGet('SELECT * FROM comentarios WHERE id = ?', [req.params.id]);
+    const existente = await db.get('SELECT * FROM comentarios WHERE id = ?', [req.params.id]);
     if (!existente) {
       return res.status(404).json({ success: false, error: 'Comentario no encontrado' });
     }
 
-    await dbRun('DELETE FROM comentarios WHERE id = ?', [req.params.id]);
+    await db.run('DELETE FROM comentarios WHERE id = ?', [req.params.id]);
     res.json({ success: true, data: { id: Number(req.params.id) } });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
@@ -375,7 +412,7 @@ app.post('/api/comentarios', async (req, res) => {
     
     const fecha = new Date().toISOString();
     const estado = 'pendiente';
-    const result = await dbRun(
+    const result = await db.run(
       'INSERT INTO comentarios (nombre, mensaje, fecha, estado) VALUES (?, ?, ?, ?)',
       [nombre, mensaje, fecha, estado]
     );
@@ -404,26 +441,43 @@ app.use((err, req, res, next) => {
 
 // ===== INICIO DEL SERVIDOR =====
 
-app.listen(PORT, () => {
-  console.log(`🎭 Servidor de Danzas Folklóricas escuchando en puerto ${PORT}`);
-  console.log(`📡 Base de datos: ${dbPath}`);
-  console.log(`🔗 Endpoints disponibles:`);
-  console.log(`   GET  /api/health`);
-  console.log(`   GET    /api/danzas`);
-  console.log(`   POST   /api/danzas        🔒 admin`);
-  console.log(`   PUT    /api/danzas/:id    🔒 admin`);
-  console.log(`   DELETE /api/danzas/:id    🔒 admin`);
-  console.log(`   GET    /api/eventos`);
-  console.log(`   POST   /api/eventos       🔒 admin`);
-  console.log(`   PUT    /api/eventos/:id   🔒 admin`);
-  console.log(`   DELETE /api/eventos/:id   🔒 admin`);
-  console.log(`   GET    /api/comentarios`);
-  console.log(`   GET    /api/comentarios/pendientes  🔒 admin`);
-  console.log(`   GET    /api/comentarios/rechazados  🔒 admin`);
-  console.log(`   GET    /api/comentarios/aprobados   🔒 admin`);
-  console.log(`   PUT    /api/comentarios/:id/estado  🔒 admin`);
-  console.log(`   DELETE /api/comentarios/:id         🔒 admin`);
-  console.log(`   POST   /api/comentarios`);
-});
+async function iniciar() {
+  try {
+    // Auto-crear tablas si no existen (necesario en un PostgreSQL recién creado)
+    await db.run(ddl.danzas);
+    await db.run(ddl.eventos);
+    await db.run(ddl.comentarios);
+
+    await ensureColumn('comentarios', 'estado', "TEXT NOT NULL DEFAULT 'aprobado'");
+    await ensureColumn('danzas', 'caracter', "TEXT DEFAULT 'festiva'");
+    console.log('✓ Migraciones aplicadas');
+  } catch (err) {
+    console.error('Error en migraciones:', err.message);
+  }
+
+  app.listen(PORT, () => {
+    console.log(`🎭 Servidor de Danzas Folklóricas escuchando en puerto ${PORT}`);
+    console.log(`🗄️  Base de datos: ${db.isPostgres ? 'PostgreSQL (Render)' : 'SQLite local'}`);
+    console.log(`🔗 Endpoints disponibles:`);
+    console.log(`   GET    /api/health`);
+    console.log(`   GET    /api/danzas?search=&page=&limit=`);
+    console.log(`   POST   /api/danzas        🔒 admin`);
+    console.log(`   PUT    /api/danzas/:id    🔒 admin`);
+    console.log(`   DELETE /api/danzas/:id    🔒 admin`);
+    console.log(`   GET    /api/eventos?page=&limit=`);
+    console.log(`   POST   /api/eventos       🔒 admin`);
+    console.log(`   PUT    /api/eventos/:id   🔒 admin`);
+    console.log(`   DELETE /api/eventos/:id   🔒 admin`);
+    console.log(`   GET    /api/comentarios?page=&limit=`);
+    console.log(`   GET    /api/comentarios/pendientes  🔒 admin`);
+    console.log(`   GET    /api/comentarios/rechazados  🔒 admin`);
+    console.log(`   GET    /api/comentarios/aprobados   🔒 admin`);
+    console.log(`   PUT    /api/comentarios/:id/estado  🔒 admin`);
+    console.log(`   DELETE /api/comentarios/:id         🔒 admin`);
+    console.log(`   POST   /api/comentarios`);
+  });
+}
+
+iniciar();
 
 module.exports = app;

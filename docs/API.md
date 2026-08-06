@@ -99,11 +99,11 @@ ADMIN_KEY=poné-acá-una-clave-secreta-larga-y-única
 
 ### GET /api/danzas
 
-Obtiene la lista completa de danzas folklóricas.
+Lista las danzas folklóricas con **paginación** y **búsqueda** opcional.
 
 **Request:**
 ```http
-GET /api/danzas HTTP/1.1
+GET /api/danzas?page=1&limit=12&search=cha HTTP/1.1
 Host: localhost:3000
 Accept: application/json
 ```
@@ -117,24 +117,27 @@ Accept: application/json
       "id": 1,
       "nombre": "Chacarera",
       "region": "Noroeste (Salta, Jujuy, Tucumán)",
+      "caracter": "festiva",
       "historia": "Danza festiva de origen andino que representa la cosecha y la alegría...",
       "coreografia": "Movimientos circulares, giros de parejas, palmoteos rítmicos...",
       "video_url": "https://www.youtube.com/embed/CKG_5PFQIA4"
-    },
-    {
-      "id": 2,
-      "nombre": "Cueca",
-      "region": "Noroeste (compartida con Chile)",
-      "historia": "Danza de cortejo entre hombre y mujer...",
-      "coreografia": "Movimientos de cadera, giros, juego de pañuelos...",
-      "video_url": "https://www.youtube.com/embed/iQWxNgL9z24"
     }
-  ]
+  ],
+  "pagination": {
+    "page": 1,
+    "limit": 12,
+    "total": 6,
+    "totalPages": 1
+  }
 }
 ```
 
-**Parámetros**: Ninguno  
-**Paginación**: No (devuelve todas las danzas)  
+**Parámetros de URL:**
+- `page` (número) - Página a consultar [opcional, default 1]
+- `limit` (número) - Ítems por página [opcional, default 12, máx 50]
+- `search` (string) - Busca por nombre (case-insensitive) [opcional]
+
+**Paginación**: Activa. El objeto `pagination` informa `page`, `limit`, `total` y `totalPages`.
 **Ordenamiento**: Alfabético por nombre (ignorando mayúsculas/minúsculas)
 
 ---
@@ -192,6 +195,7 @@ X-API-Key: mi-clave-secreta
 {
   "nombre": "Vidala",
   "region": "Noroeste",
+  "caracter": "ritual",
   "historia": "Composición musical de carácter triste y elegíaco de origen colonial español con influencia indígena. Expresión de dolor, pena y nostalgia.",
   "coreografia": "Movimientos lentos, ondulantes, expresivos. Sin parejas. Generalmente cantada.",
   "video_url": "https://www.youtube.com/embed/..."
@@ -206,6 +210,7 @@ X-API-Key: mi-clave-secreta
     "id": 7,
     "nombre": "Vidala",
     "region": "Noroeste",
+    "caracter": "ritual",
     "historia": "Composición musical de carácter triste...",
     "coreografia": "Movimientos lentos, ondulantes...",
     "video_url": "https://www.youtube.com/embed/..."
@@ -232,6 +237,7 @@ X-API-Key: mi-clave-secreta
 **Parámetros del Body:**
 - `nombre` (string, 1-200) - Nombre de la danza [requerido]
 - `region` (string, 1-200) - Región de origen [requerido]
+- `caracter` (string) - Carácter: `festiva`, `ceremonial`, `romántica`, `guerrera`, `comunitaria` o `ritual` [opcional, default `festiva`]
 - `historia` (string, 0-2000) - Historia y contexto [opcional]
 - `coreografia` (string, 0-2000) - Descripción de coreografía [opcional]
 - `video_url` (string, 0-500) - URL de video (YouTube embed) [opcional]
@@ -246,11 +252,11 @@ X-API-Key: mi-clave-secreta
 
 ### GET /api/eventos
 
-Obtiene la lista de eventos ordenados por fecha descendente.
+Obtiene los eventos con **paginación**, ordenados por fecha descendente.
 
 **Request:**
 ```http
-GET /api/eventos HTTP/1.1
+GET /api/eventos?page=1&limit=6 HTTP/1.1
 Host: localhost:3000
 Accept: application/json
 ```
@@ -266,17 +272,20 @@ Accept: application/json
       "fecha": "2025-10-12",
       "lugar": "Plaza Pública, Corrientes",
       "descripcion": "Festival anual con presentaciones de grupos folklóricos, talleres gratuitos y venta de artesanías tradicionales."
-    },
-    {
-      "id": 2,
-      "titulo": "Taller de Chacarera Intermedio",
-      "fecha": "2025-09-13",
-      "lugar": "Estudio de Danzas Folklóricas, San Miguel",
-      "descripcion": "Taller intensivo sobre técnica y coreografía de Chacarera. Requisito: experiencia previa."
     }
-  ]
+  ],
+  "pagination": {
+    "page": 1,
+    "limit": 6,
+    "total": 3,
+    "totalPages": 1
+  }
 }
 ```
+
+**Parámetros de URL:**
+- `page` (número) - Página a consultar [opcional, default 1]
+- `limit` (número) - Ítems por página [opcional, default 6, máx 50]
 
 **Ordenamiento**: Por fecha descendente (próximos eventos primero)
 
@@ -346,11 +355,11 @@ Content-Type: application/json
 
 ### GET /api/comentarios
 
-Obtiene los últimos 50 comentarios **aprobados** (los que ya pasaron la moderación), ordenados por fecha descendente.
+Obtiene los comentarios **aprobados** (los que ya pasaron la moderación) con **paginación**, ordenados por fecha descendente.
 
 **Request:**
 ```http
-GET /api/comentarios HTTP/1.1
+GET /api/comentarios?page=1&limit=10 HTTP/1.1
 Host: localhost:3000
 Accept: application/json
 ```
@@ -367,11 +376,20 @@ Accept: application/json
       "fecha": "2025-09-06T14:30:45.123Z",
       "estado": "aprobado"
     }
-  ]
+  ],
+  "pagination": {
+    "page": 1,
+    "limit": 10,
+    "total": 2,
+    "totalPages": 1
+  }
 }
 ```
 
-**Límite**: Últimos 50 comentarios  
+**Parámetros de URL:**
+- `page` (número) - Página a consultar [opcional, default 1]
+- `limit` (número) - Ítems por página [opcional, default 10, máx 50]
+
 **Ordenamiento**: Por fecha descendente (más nuevos primero)  
 **Nota**: Solo se devuelven comentarios con `estado = "aprobado"`. Los pendientes no son visibles al público.
 
@@ -676,9 +694,9 @@ Todos los errores siguen este formato:
 
 ## 📈 Límites
 
-- **Comentarios listados**: Máximo 50
+- **Paginación**: `page` default 1; `limit` default 12 (danzas), 6 (eventos), 10 (comentarios); máximo 50
 - **Longitud de cadenas**: Especificada por campo
-- **Tamaño de base de datos**: Sin límite en desarrollo, ilimitado en Render
+- **Base de datos**: PostgreSQL en producción (persistente), SQLite en desarrollo
 
 ---
 
@@ -687,7 +705,7 @@ Todos los errores siguen este formato:
 1. **Testing rápido**: Usa Postman, Insomnia, o REST Client de VS Code
 2. **Debugging**: Revisa los logs del servidor en la terminal
 3. **CORS**: Si tienes problemas, revisa la configuración en `server.js`
-4. **Base de datos**: Los datos se reinician al reiniciar el servidor (en desarrollo)
+4. **Base de datos**: En desarrollo usa SQLite (`danzas.db`). En producción usa PostgreSQL si está definida `DATABASE_URL`. `npm run init-db` borra y recrea los datos de ejemplo.
 
 ---
 

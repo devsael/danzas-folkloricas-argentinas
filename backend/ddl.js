@@ -1,0 +1,62 @@
+// ============================================
+// DDL COMPARTIDO (SQLite y PostgreSQL)
+// ============================================
+// Sentencias CREATE TABLE para los dos motores que soporta la app.
+// Se usan tanto en init-db.js (crear + sembrar) como en server.js
+// (auto-creación de tablas al arrancar, útil en un PostgreSQL nuevo).
+
+const db = require('./db');
+
+const danzas = db.isPostgres
+  ? `CREATE TABLE IF NOT EXISTS danzas (
+      id SERIAL PRIMARY KEY,
+      nombre TEXT NOT NULL UNIQUE,
+      region TEXT NOT NULL,
+      caracter TEXT DEFAULT 'festiva',
+      historia TEXT,
+      coreografia TEXT,
+      video_url TEXT
+    )`
+  : `CREATE TABLE IF NOT EXISTS danzas (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      nombre TEXT NOT NULL UNIQUE,
+      region TEXT NOT NULL,
+      caracter TEXT DEFAULT 'festiva',
+      historia TEXT,
+      coreografia TEXT,
+      video_url TEXT
+    )`;
+
+const eventos = db.isPostgres
+  ? `CREATE TABLE IF NOT EXISTS eventos (
+      id SERIAL PRIMARY KEY,
+      titulo TEXT NOT NULL,
+      fecha TEXT NOT NULL,
+      lugar TEXT,
+      descripcion TEXT
+    )`
+  : `CREATE TABLE IF NOT EXISTS eventos (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      titulo TEXT NOT NULL,
+      fecha TEXT NOT NULL,
+      lugar TEXT,
+      descripcion TEXT
+    )`;
+
+const comentarios = db.isPostgres
+  ? `CREATE TABLE IF NOT EXISTS comentarios (
+      id SERIAL PRIMARY KEY,
+      nombre TEXT NOT NULL,
+      mensaje TEXT NOT NULL,
+      fecha TEXT NOT NULL,
+      estado TEXT NOT NULL DEFAULT 'pendiente'
+    )`
+  : `CREATE TABLE IF NOT EXISTS comentarios (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      nombre TEXT NOT NULL,
+      mensaje TEXT NOT NULL,
+      fecha TEXT NOT NULL,
+      estado TEXT NOT NULL DEFAULT 'pendiente'
+    )`;
+
+module.exports = { danzas, eventos, comentarios };

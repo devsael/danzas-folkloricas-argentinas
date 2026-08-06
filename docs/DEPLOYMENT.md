@@ -63,7 +63,7 @@ Cuando se abra el formulario de configuración:
 ```
 Name:                      danzas-folklóricas-api
 Environment:               Node
-Build Command:             npm install && npm run init-db
+Build Command:             npm install
 Start Command:             npm start
 Runtime:                   Node 18
 Plan:                      Free (Gratuito)
@@ -104,11 +104,30 @@ En el dashboard de Render, ve a "Environment":
 ```
 NODE_ENV = production
 PORT = 3000
+ADMIN_KEY = poné-acá-tu-clave-secreta-para-el-panel-admin
 ```
 
 Render asignará automáticamente el puerto.
 
-### 1.5 Desplegar
+### 1.5 PostgreSQL (datos persistentes)
+
+Con el plan Free, **SQLite se borra en cada deploy**. Para que las danzas, eventos y comentarios sean persistentes, configurá PostgreSQL:
+
+1. En Render, click en **New + → PostgreSQL**.
+2. Elegí el plan **Free** y creá la base. Copiá la **Internal Database URL**.
+3. En tu Web Service, ve a **Environment** y agregá la variable:
+   ```
+   DATABASE_URL = postgres://... (la Internal Database URL que copiaste)
+   ```
+4. Ejecutá una sola vez la inicialización con los datos de ejemplo. En el Web Service, abrí la pestaña **Shell** y corré:
+   ```bash
+   npm run init-db
+   ```
+5. Reiniciá el servicio (Manual Deploy → Deploy). El servidor además **crea las tablas automáticamente** si no existen al arrancar.
+
+> ⚠️ `npm run init-db` **borra y recrea** los datos. Correlo solo una vez (o cuando quieras resetear a los datos de ejemplo).
+
+### 1.6 Desplegar
 
 1. Haz push de los cambios a GitHub:
 ```bash
@@ -122,7 +141,7 @@ git push
 4. Verás un mensaje: "Your service is live on..."
 5. **Copia la URL**: `https://danzas-folklóricas-api.onrender.com` (será similar)
 
-### 1.6 Verificar que funciona
+### 1.7 Verificar que funciona
 
 ```bash
 # Desde terminal
@@ -287,10 +306,12 @@ git push
 
 ### Problema: Base de datos vacía después del deploy
 
+**Causa**: Con plan Free y **sin** PostgreSQL, SQLite se borra en cada deploy (Render usa un filesystem efímero).
+
 **Solución**:
-- Render ejecuta `npm run init-db` en cada deploy
-- Los datos se reinician
-- Para datos persistentes, considera PostgreSQL de Render
+- Configurá PostgreSQL como se explica en el **Paso 1.5**
+- Con `DATABASE_URL` definida, los datos persisten entre deploys
+- `npm run init-db` se ejecuta **una sola vez** para sembrar los datos de ejemplo
 
 ---
 

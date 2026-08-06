@@ -110,6 +110,25 @@ function mostrarEstado(elementId, mensaje, tipo) {
 }
 
 // ============================================
+// CARÁCTER DE LAS DANZAS
+// ============================================
+
+const CARACTERES_ADMIN = {
+    'festiva':     { label: 'Festiva',     emoji: '🎉' },
+    'ceremonial':  { label: 'Ceremonial',  emoji: '🪔' },
+    'romántica':   { label: 'Romántica',   emoji: '💞' },
+    'guerrera':    { label: 'Guerrera',    emoji: '⚔️' },
+    'comunitaria': { label: 'Comunitaria', emoji: '👥' },
+    'ritual':      { label: 'Ritual',      emoji: '🌀' }
+};
+
+function badgeCaracterAdmin(caracter) {
+    const info = CARACTERES_ADMIN[caracter] || { label: caracter || 'Festiva', emoji: '🎉' };
+    const clave = CARACTERES_ADMIN[caracter] ? caracter : 'festiva';
+    return `<span class="caracter-badge caracter-${clave}">${info.emoji} ${info.label}</span>`;
+}
+
+// ============================================
 // DANZAS
 // ============================================
 
@@ -126,12 +145,13 @@ formDanza.addEventListener('submit', async (e) => {
     const id = document.getElementById('d-id').value;
     const nombre = document.getElementById('d-nombre').value.trim();
     const region = document.getElementById('d-region').value.trim();
+    const caracter = document.getElementById('d-caracter').value;
     const historia = document.getElementById('d-historia').value.trim();
     const coreografia = document.getElementById('d-coreografia').value.trim();
     const video_url = document.getElementById('d-video').value.trim();
 
-    if (!nombre || !region) {
-        mostrarEstado('danza-status', 'Nombre y región son obligatorios', 'error');
+    if (!nombre || !region || !caracter) {
+        mostrarEstado('danza-status', 'Nombre, región y carácter son obligatorios', 'error');
         return;
     }
 
@@ -143,7 +163,7 @@ formDanza.addEventListener('submit', async (e) => {
         const response = await fetch(url, {
             method,
             headers: adminHeaders(),
-            body: JSON.stringify({ nombre, region, historia, coreografia, video_url })
+            body: JSON.stringify({ nombre, region, caracter, historia, coreografia, video_url })
         });
 
         const json = await response.json();
@@ -185,6 +205,7 @@ function editarDanza(id) {
     document.getElementById('d-id').value = danza.id;
     document.getElementById('d-nombre').value = danza.nombre;
     document.getElementById('d-region').value = danza.region;
+    document.getElementById('d-caracter').value = danza.caracter || 'festiva';
     document.getElementById('d-historia').value = danza.historia || '';
     document.getElementById('d-coreografia').value = danza.coreografia || '';
     document.getElementById('d-video').value = danza.video_url || '';
@@ -238,6 +259,7 @@ async function cargarDanzasAdmin() {
                     <div class="admin-list-content">
                         <h4>💃 ${d.nombre}</h4>
                         <p><strong>Región:</strong> ${d.region}</p>
+                        <p>${badgeCaracterAdmin(d.caracter)}</p>
                         <p>${(d.historia || '').substring(0, 120)}${d.historia && d.historia.length > 120 ? '...' : ''}</p>
                     </div>
                     <div class="admin-list-actions">
