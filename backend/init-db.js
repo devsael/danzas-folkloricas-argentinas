@@ -140,7 +140,29 @@ async function main() {
     }
   }
 
-  // Limpiar tablas (init completo)
+  // Migración: asegurar columna imagen_url en danzas
+  if (db.isPostgres) {
+    await db.run('ALTER TABLE danzas ADD COLUMN IF NOT EXISTS imagen_url TEXT');
+  } else {
+    const cols = await db.all('PRAGMA table_info(danzas)');
+    if (!cols.some(c => c.name === 'imagen_url')) {
+      await db.run('ALTER TABLE danzas ADD COLUMN imagen_url TEXT');
+    }
+  }
+
+  // Solo sembrar si las tablas están vacías (no pisar datos del admin en cada deploy)
+  const countD = await db.get('SELECT COUNT(*) AS c FROM danzas');
+  const countE = await db.get('SELECT COUNT(*) AS c FROM eventos');
+  const countC = await db.get('SELECT COUNT(*) AS c FROM comentarios');
+
+  if (countD.c > 0 || countE.c > 0 || countC.c > 0) {
+    console.log('ℹ️  Las tablas ya tienen datos. No se vuelven a sembrar para no pisar la información existente.');
+    console.log('    (Si querés reiniciar todo, borrá las filas o usá un entorno limpio.)');
+    await db.close();
+    return;
+  }
+
+  // Limpiar tablas (base recién creada)
   await db.run('DELETE FROM danzas');
   await db.run('DELETE FROM eventos');
   await db.run('DELETE FROM comentarios');
