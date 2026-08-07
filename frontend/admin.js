@@ -75,6 +75,8 @@ function iniciarAdmin() {
     cargarDanzasAdmin();
     cargarEventosAdmin();
     cargarComentariosAdmin();
+    cargarCursosAdmin();
+    cargarCodigosAdmin();
 }
 
 // ============================================
@@ -439,6 +441,303 @@ async function cargarEventosAdmin() {
         }
     } catch (error) {
         lista.innerHTML = '<p class="loading">⚠️ No se pudo conectar con el servidor</p>';
+    }
+}
+
+// ============================================
+// CURSOS PREMIUM
+// ============================================
+
+const formCurso = document.getElementById('form-curso');
+const cursoSubmitBtn = document.getElementById('curso-submit-btn');
+const cursoCancelBtn = document.getElementById('curso-cancel-btn');
+const cursoFormTitle = document.getElementById('curso-form-title');
+
+let cursosCache = [];
+
+formCurso.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const id = document.getElementById('c-id').value;
+    const nombre = document.getElementById('c-nombre').value.trim();
+    const descripcion = document.getElementById('c-descripcion').value.trim();
+    const drive_url = document.getElementById('c-drive').value.trim();
+
+    if (!nombre || !drive_url) {
+        mostrarEstado('curso-status', 'Nombre y enlace de Drive son obligatorios', 'error');
+        return;
+    }
+
+    const esEdicion = !!id;
+    const url = esEdicion ? `${API_URL}/api/cursos/${id}` : `${API_URL}/api/cursos`;
+    const method = esEdicion ? 'PUT' : 'POST';
+
+    try {
+        const response = await fetch(url, {
+            method,
+            headers: adminHeaders(),
+            body: JSON.stringify({ nombre, descripcion, drive_url })
+        });
+
+        const json = await response.json();
+
+        if (response.status === 401) {
+            manejarNoAutorizado();
+            return;
+        }
+
+        if (json.success) {
+            mostrarEstado('curso-status', esEdicion
+                ? `✓ "${nombre}" fue actualizado correctamente`
+                : `✓ "${nombre}" fue creado correctamente`, 'success');
+            cancelarEdicionCurso();
+            cargarCursosAdmin();
+            cargarCodigosAdmin();
+        } else {
+            mostrarEstado('curso-status', `Error: ${json.error}`, 'error');
+        }
+    } catch (error) {
+        console.error(error);
+        mostrarEstado('curso-status', 'No se pudo conectar con el servidor', 'error');
+    }
+});
+
+cursoCancelBtn.addEventListener('click', cancelarEdicionCurso);
+
+function cancelarEdicionCurso() {
+    formCurso.reset();
+    document.getElementById('c-id').value = '';
+    cursoFormTitle.textContent = 'Nuevo Curso';
+    cursoSubmitBtn.textContent = 'Guardar Curso';
+    cursoCancelBtn.style.display = 'none';
+}
+
+function editarCurso(id) {
+    const curso = cursosCache.find(c => c.id === id);
+    if (!curso) return;
+
+    document.getElementById('c-id').value = curso.id;
+    document.getElementById('c-nombre').value = curso.nombre;
+    document.getElementById('c-descripcion').value = curso.descripcion || '';
+    document.getElementById('c-drive').value = curso.drive_url || '';
+
+    cursoFormTitle.textContent = `Editando: ${curso.nombre}`;
+    cursoSubmitBtn.textContent = 'Actualizar Curso';
+    cursoCancelBtn.style.display = 'inline-block';
+
+    document.querySelectorAll('.admin-form-card')[3].scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+async function eliminarCurso(id, nombre) {
+    if (!confirm(`¿Seguro que querés eliminar "${nombre}"? Se borrarán también sus códigos de acceso.`)) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_URL}/api/cursos/${id}`, {
+            method: 'DELETE',
+            headers: { 'X-API-Key': getAdminKey() }
+        });
+        const json = await response.json();
+
+        if (response.status === 401) {
+            manejarNoAutorizado();
+            return;
+        }
+
+        if (json.success) {
+            mostrarEstado('curso-status', `✓ "${nombre}" fue eliminado`, 'success');
+            cargarCursosAdmin();
+            cargarCodigosAdmin();
+        } else {
+            mostrarEstado('curso-status', `Error: ${json.error}`, 'error');
+        }
+    } catch (error) {
+        console.error(error);
+        mostrarEstado('curso-status', 'No se pudo conectar con el servidor', 'error');
+    }
+}
+
+async function cargarCursosAdmin() {
+    const lista = document.getElementById('cursos-admin-lista');
+    try {
+        const response = await fetch(`${API_URL}/api/cursos`, { headers: { 'X-API-Key': getAdminKey() } });
+
+        if (response.status === 401) {
+            manejarNoAutorizado();
+            return;
+        }
+
+        const json = await response.json();
+
+        if (json.success && json.data.length > 0) {
+            cursosCache = json.data;
+            lista.innerHTML = json.data.map(c => `
+                <div class="admin-list-item">
+                    <div class="admin-list-content">
+                        <h4>🎓 ${escapeHtml(c.nombre)}</h4>
+                        <p>${c.descripcion ? escapeHtml(c.descripcion.substring(0, 120)) + (c.descripcion.length > 120 ? '...' : '') : ''}</p>
+                        <p style="font-size:0.8rem; color:#999;">🔗 Enlace privado (solo se entrega con el código)</p>
+                    </div>
+                    <div class="admin-list-actions">
+                        <button class="admin-action-btn btn-editar" onclick="editarCurso(${c.id})">Editar</button>
+                        <button class="admin-action-btn btn-eliminar" onclick="eliminarCurso(${c.id}, '${c.nombre.replace(/'/g, "\\'")}')">Eliminar</button>
+                    </div>
+                </div>
+            `).join('');
+        } else {
+            cursosCache = [];
+            lista.innerHTML = '<p class="loading">Todavía no hay cursos cargados</p>';
+        }
+
+        llenarSelectCursos();
+    } catch (error) {
+        console.error(error);
+        lista.innerHTML = '<p class="loading">⚠️ No se pudo conectar con el servidor</p>';
+    }
+}
+
+function llenarSelectCursos() {
+    const select = document.getElementById('codigo-curso');
+    select.innerHTML = '';
+
+    if (cursosCache.length === 0) {
+        select.innerHTML = '<option value="">Primero creá un curso</option>';
+        return;
+    }
+
+    cursosCache.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.id;
+        opt.textContent = c.nombre;
+        select.appendChild(opt);
+    });
+}
+
+// ============================================
+// CÓDIGOS DE ACCESO
+// ============================================
+
+const formCodigoAdmin = document.getElementById('form-codigo-admin');
+
+formCodigoAdmin.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const curso_id = document.getElementById('codigo-curso').value;
+    const nombre_cliente = document.getElementById('codigo-cliente').value.trim();
+
+    if (!curso_id) {
+        mostrarEstado('codigo-admin-status', 'Primero creá un curso y seleccionalo', 'error');
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_URL}/api/codigos`, {
+            method: 'POST',
+            headers: adminHeaders(),
+            body: JSON.stringify({ curso_id: Number(curso_id), nombre_cliente })
+        });
+
+        const json = await response.json();
+
+        if (response.status === 401) {
+            manejarNoAutorizado();
+            return;
+        }
+
+        if (json.success) {
+            const cont = document.getElementById('codigo-generado');
+            cont.innerHTML = `
+                <p>✅ Código generado${json.data.nombre_cliente ? ' para ' + escapeHtml(json.data.nombre_cliente) : ''}:</p>
+                <div class="codigo-chip">${json.data.codigo}</div>
+                <p style="font-size:0.85rem; color:#777;">Pasaló por WhatsApp o email al alumno. Lo usa en la sección "Mis Cursos".</p>`;
+            cont.style.display = 'block';
+            document.getElementById('codigo-cliente').value = '';
+            mostrarEstado('codigo-admin-status', 'Código generado', 'success');
+            cargarCodigosAdmin();
+        } else {
+            mostrarEstado('codigo-admin-status', `Error: ${json.error}`, 'error');
+        }
+    } catch (error) {
+        console.error(error);
+        mostrarEstado('codigo-admin-status', 'No se pudo conectar con el servidor', 'error');
+    }
+});
+
+function formatFecha(fecha) {
+    if (!fecha) return '';
+    const d = new Date(fecha);
+    if (isNaN(d.getTime())) return fecha;
+    return d.toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' });
+}
+
+async function cargarCodigosAdmin() {
+    const lista = document.getElementById('codigos-admin-lista');
+    try {
+        const response = await fetch(`${API_URL}/api/codigos`, { headers: { 'X-API-Key': getAdminKey() } });
+
+        if (response.status === 401) {
+            manejarNoAutorizado();
+            return;
+        }
+
+        const json = await response.json();
+
+        if (json.success && json.data.length > 0) {
+            lista.innerHTML = json.data.map(c => {
+                const estadoBadge = c.estado === 'activo'
+                    ? '<span class="codigo-estado activo">activo</span>'
+                    : '<span class="codigo-estado revocado">revocado</span>';
+                return `
+                    <div class="admin-list-item">
+                        <div class="admin-list-content">
+                            <h4><span class="codigo-chip-small">${c.codigo}</span></h4>
+                            <p><strong>${escapeHtml(c.curso_nombre || '—')}</strong></p>
+                            <p>${c.nombre_cliente ? 'Cliente: ' + escapeHtml(c.nombre_cliente) : 'Sin nombre de cliente'}</p>
+                            <p style="font-size:0.8rem; color:#999;">Creado: ${formatFecha(c.creado)}${c.usado ? ' · Usado: ' + formatFecha(c.usado) : ''}</p>
+                        </div>
+                        <div class="admin-list-actions">
+                            ${estadoBadge}
+                            <button class="admin-action-btn btn-eliminar" onclick="eliminarCodigo(${c.id}, '${c.codigo}')">Eliminar</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        } else {
+            lista.innerHTML = '<p class="loading">Todavía no hay códigos generados</p>';
+        }
+    } catch (error) {
+        console.error(error);
+        lista.innerHTML = '<p class="loading">⚠️ No se pudo conectar con el servidor</p>';
+    }
+}
+
+async function eliminarCodigo(id, codigo) {
+    if (!confirm(`¿Revocar y eliminar el código ${codigo}?`)) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_URL}/api/codigos/${id}`, {
+            method: 'DELETE',
+            headers: { 'X-API-Key': getAdminKey() }
+        });
+        const json = await response.json();
+
+        if (response.status === 401) {
+            manejarNoAutorizado();
+            return;
+        }
+
+        if (json.success) {
+            mostrarEstado('codigo-admin-status', `✓ Código ${codigo} eliminado`, 'success');
+            cargarCodigosAdmin();
+        } else {
+            mostrarEstado('codigo-admin-status', `Error: ${json.error}`, 'error');
+        }
+    } catch (error) {
+        console.error(error);
+        mostrarEstado('codigo-admin-status', 'No se pudo conectar con el servidor', 'error');
     }
 }
 

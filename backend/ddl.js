@@ -61,4 +61,40 @@ const comentarios = db.isPostgres
       estado TEXT NOT NULL DEFAULT 'pendiente'
     )`;
 
-module.exports = { danzas, eventos, comentarios };
+const cursos = db.isPostgres
+  ? `CREATE TABLE IF NOT EXISTS cursos (
+      id SERIAL PRIMARY KEY,
+      nombre TEXT NOT NULL,
+      descripcion TEXT,
+      drive_url TEXT NOT NULL,
+      creado TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`
+  : `CREATE TABLE IF NOT EXISTS cursos (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      nombre TEXT NOT NULL,
+      descripcion TEXT,
+      drive_url TEXT NOT NULL,
+      creado TEXT NOT NULL DEFAULT (datetime('now'))
+    )`;
+
+const codigos = db.isPostgres
+  ? `CREATE TABLE IF NOT EXISTS codigos (
+      id SERIAL PRIMARY KEY,
+      codigo TEXT NOT NULL UNIQUE,
+      curso_id INTEGER NOT NULL,
+      estado TEXT NOT NULL DEFAULT 'activo',
+      nombre_cliente TEXT,
+      usado TEXT,
+      creado TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`
+  : `CREATE TABLE IF NOT EXISTS codigos (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      codigo TEXT NOT NULL UNIQUE,
+      curso_id INTEGER NOT NULL,
+      estado TEXT NOT NULL DEFAULT 'activo',
+      nombre_cliente TEXT,
+      usado TEXT,
+      creado TEXT NOT NULL DEFAULT (datetime('now'))
+    )`;
+
+module.exports = { danzas, eventos, comentarios, cursos, codigos };

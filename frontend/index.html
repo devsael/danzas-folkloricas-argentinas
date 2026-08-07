@@ -28,6 +28,7 @@
                 <li><a href="#plan-estudio" class="nav-link">Plan de Estudio</a></li>
                 <li><a href="#danzas" class="nav-link">Danzas</a></li>
                 <li><a href="#recursos" class="nav-link">Recursos</a></li>
+                <li><a href="#mis-cursos" class="nav-link">Mis Cursos</a></li>
                 <li><a href="#eventos" class="nav-link">Eventos</a></li>
                 <li><a href="#comentarios" class="nav-link">Libro de Visitas</a></li>
             </ul>
@@ -148,6 +149,27 @@
             <h2 class="section-title">📦 Recursos y Material de Estudio</h2>
             <p class="section-subtitle">Cursos, bibliografía e imágenes guardadas en Google Drive</p>
             <div id="recursos-lista"></div>
+        </div>
+    </section>
+
+    <!-- SECCIÓN: MIS CURSOS (acceso con código premium) -->
+    <section id="mis-cursos" class="cursos-section">
+        <div class="container">
+            <h2 class="section-title">🎓 Mis Cursos</h2>
+            <p class="section-subtitle">Ingresá tu código de acceso para abrir tu curso</p>
+
+            <div class="cursos-acceso">
+                <form id="form-codigo" class="form">
+                    <div class="form-group">
+                        <label for="codigo-input">Tu código de acceso</label>
+                        <input type="text" id="codigo-input" placeholder="DFA-XXXX-XXXX" maxlength="20" autocomplete="off" required>
+                    </div>
+                    <button type="submit" class="submit-button">Acceder a mi curso</button>
+                    <div id="codigo-status" class="form-status"></div>
+                </form>
+
+                <div id="curso-desbloqueado" class="curso-desbloqueado" style="display:none;"></div>
+            </div>
         </div>
     </section>
 

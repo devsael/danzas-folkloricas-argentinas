@@ -284,6 +284,194 @@ app.delete('/api/eventos/:id', requireAdminKey, async (req, res) => {
   }
 });
 
+// ===== CURSOS (premium) =====
+
+const crypto = require('crypto');
+
+function generarCodigoAcceso() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let s = '';
+  for (let i = 0; i < 8; i++) s += chars[crypto.randomInt(chars.length)];
+  return 'DFA-' + s.slice(0, 4) + '-' + s.slice(4);
+}
+
+// GET /api/cursos - Listar cursos (solo admin; incluye los enlaces de Drive)
+app.get('/api/cursos', requireAdminKey, async (req, res) => {
+  try {
+    const cursos = await db.all('SELECT * FROM cursos ORDER BY nombre ASC');
+    res.json({ success: true, data: cursos });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// POST /api/cursos - Crear un curso (solo admin)
+app.post('/api/cursos', requireAdminKey, async (req, res) => {
+  try {
+    const { nombre, descripcion, drive_url } = req.body;
+
+    if (!nombre || !drive_url) {
+      return res.status(400).json({ success: false, error: 'Nombre y enlace de Drive son obligatorios' });
+    }
+
+    const result = await db.run(
+      'INSERT INTO cursos (nombre, descripcion, drive_url) VALUES (?, ?, ?)',
+      [nombre, descripcion || '', drive_url]
+    );
+
+    res.status(201).json({
+      success: true,
+      data: { id: result.lastID, nombre, descripcion, drive_url }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// PUT /api/cursos/:id - Editar un curso (solo admin)
+app.put('/api/cursos/:id', requireAdminKey, async (req, res) => {
+  try {
+    const { nombre, descripcion, drive_url } = req.body;
+
+    if (!nombre || !drive_url) {
+      return res.status(400).json({ success: false, error: 'Nombre y enlace de Drive son obligatorios' });
+    }
+
+    const existente = await db.get('SELECT * FROM cursos WHERE id = ?', [req.params.id]);
+    if (!existente) {
+      return res.status(404).json({ success: false, error: 'Curso no encontrado' });
+    }
+
+    await db.run(
+      'UPDATE cursos SET nombre = ?, descripcion = ?, drive_url = ? WHERE id = ?',
+      [nombre, descripcion || '', drive_url, req.params.id]
+    );
+
+    res.json({ success: true, data: { id: Number(req.params.id), nombre, descripcion, drive_url } });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// DELETE /api/cursos/:id - Eliminar un curso y sus códigos (solo admin)
+app.delete('/api/cursos/:id', requireAdminKey, async (req, res) => {
+  try {
+    const existente = await db.get('SELECT * FROM cursos WHERE id = ?', [req.params.id]);
+    if (!existente) {
+      return res.status(404).json({ success: false, error: 'Curso no encontrado' });
+    }
+
+    await db.run('DELETE FROM codigos WHERE curso_id = ?', [req.params.id]);
+    await db.run('DELETE FROM cursos WHERE id = ?', [req.params.id]);
+    res.json({ success: true, data: { id: Number(req.params.id) } });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ===== CÓDIGOS DE ACCESO (premium) =====
+
+// GET /api/codigos - Listar códigos con el curso asignado (solo admin)
+app.get('/api/codigos', requireAdminKey, async (req, res) => {
+  try {
+    const codigos = await db.all(`
+      SELECT c.id, c.codigo, c.estado, c.nombre_cliente, c.usado, c.creado,
+             cu.nombre AS curso_nombre
+      FROM codigos c LEFT JOIN cursos cu ON c.curso_id = cu.id
+      ORDER BY c.id DESC
+    `);
+    res.json({ success: true, data: codigos });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// POST /api/codigos - Generar un código para un curso (solo admin)
+app.post('/api/codigos', requireAdminKey, async (req, res) => {
+  try {
+    const { curso_id, nombre_cliente } = req.body;
+
+    if (!curso_id) {
+      return res.status(400).json({ success: false, error: 'Debés elegir un curso' });
+    }
+
+    const curso = await db.get('SELECT * FROM cursos WHERE id = ?', [curso_id]);
+    if (!curso) {
+      return res.status(404).json({ success: false, error: 'Curso no encontrado' });
+    }
+
+    const codigo = generarCodigoAcceso();
+    await db.run(
+      'INSERT INTO codigos (codigo, curso_id, estado, nombre_cliente) VALUES (?, ?, ?, ?)',
+      [codigo, curso_id, 'activo', nombre_cliente || '']
+    );
+
+    res.status(201).json({
+      success: true,
+      data: { codigo, curso_id: Number(curso_id), nombre_cliente: nombre_cliente || '' }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// DELETE /api/codigos/:id - Revocar/eliminar un código (solo admin)
+app.delete('/api/codigos/:id', requireAdminKey, async (req, res) => {
+  try {
+    const existente = await db.get('SELECT * FROM codigos WHERE id = ?', [req.params.id]);
+    if (!existente) {
+      return res.status(404).json({ success: false, error: 'Código no encontrado' });
+    }
+
+    await db.run('DELETE FROM codigos WHERE id = ?', [req.params.id]);
+    res.json({ success: true, data: { id: Number(req.params.id) } });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ===== MIS CURSOS (público: entrega el enlace solo con un código válido) =====
+
+// POST /api/mis-cursos - El visitante ingresa su código y recibe el curso
+app.post('/api/mis-cursos', async (req, res) => {
+  try {
+    const { codigo } = req.body;
+
+    if (!codigo || !codigo.trim()) {
+      return res.status(400).json({ success: false, error: 'Ingresá tu código de acceso' });
+    }
+
+    const registro = await db.get('SELECT * FROM codigos WHERE codigo = ?', [codigo.trim()]);
+    if (!registro) {
+      return res.status(404).json({ success: false, error: 'Código inválido. Verificá que esté bien escrito.' });
+    }
+
+    if (registro.estado !== 'activo') {
+      return res.status(403).json({ success: false, error: 'Este código ya no está activo.' });
+    }
+
+    const curso = await db.get('SELECT * FROM cursos WHERE id = ?', [registro.curso_id]);
+    if (!curso) {
+      return res.status(404).json({ success: false, error: 'El curso asociado a este código ya no existe.' });
+    }
+
+    await db.run('UPDATE codigos SET usado = ? WHERE id = ?', [new Date().toISOString(), registro.id]);
+
+    res.json({
+      success: true,
+      data: {
+        curso: {
+          nombre: curso.nombre,
+          descripcion: curso.descripcion,
+          drive_url: curso.drive_url
+        }
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // ===== COMENTARIOS =====
 
 // GET /api/comentarios - Comentarios aprobados (público) con paginación
@@ -447,6 +635,8 @@ async function iniciar() {
     await db.run(ddl.danzas);
     await db.run(ddl.eventos);
     await db.run(ddl.comentarios);
+    await db.run(ddl.cursos);
+    await db.run(ddl.codigos);
 
     await ensureColumn('comentarios', 'estado', "TEXT NOT NULL DEFAULT 'aprobado'");
     await ensureColumn('danzas', 'caracter', "TEXT DEFAULT 'festiva'");
@@ -469,6 +659,14 @@ async function iniciar() {
     console.log(`   POST   /api/eventos       🔒 admin`);
     console.log(`   PUT    /api/eventos/:id   🔒 admin`);
     console.log(`   DELETE /api/eventos/:id   🔒 admin`);
+    console.log(`   GET    /api/cursos              🔒 admin`);
+    console.log(`   POST   /api/cursos              🔒 admin`);
+    console.log(`   PUT    /api/cursos/:id          🔒 admin`);
+    console.log(`   DELETE /api/cursos/:id          🔒 admin`);
+    console.log(`   GET    /api/codigos             🔒 admin`);
+    console.log(`   POST   /api/codigos             🔒 admin`);
+    console.log(`   DELETE /api/codigos/:id         🔒 admin`);
+    console.log(`   POST   /api/mis-cursos          🔑 requiere código`);
     console.log(`   GET    /api/comentarios?page=&limit=`);
     console.log(`   GET    /api/comentarios/pendientes  🔒 admin`);
     console.log(`   GET    /api/comentarios/rechazados  🔒 admin`);

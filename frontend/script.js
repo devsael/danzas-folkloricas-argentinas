@@ -579,6 +579,66 @@ function mostrarEstado(mensaje, tipo) {
 }
 
 // ============================================
+// MIS CURSOS (acceso con código premium)
+// ============================================
+
+const formCodigo = document.getElementById('form-codigo');
+const codigoStatus = document.getElementById('codigo-status');
+const cursoDesbloqueado = document.getElementById('curso-desbloqueado');
+
+if (formCodigo) {
+    formCodigo.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const codigoInput = document.getElementById('codigo-input');
+        const codigo = codigoInput.value.trim();
+
+        cursoDesbloqueado.style.display = 'none';
+
+        if (!codigo) {
+            codigoStatus.className = 'form-status error';
+            codigoStatus.textContent = 'Ingresá tu código de acceso';
+            codigoStatus.style.display = 'block';
+            return;
+        }
+
+        codigoStatus.className = 'form-status';
+        codigoStatus.textContent = 'Verificando código...';
+        codigoStatus.style.display = 'block';
+
+        try {
+            const response = await fetch(`${API_URL}/api/mis-cursos`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ codigo })
+            });
+
+            const json = await response.json();
+
+            if (json.success) {
+                const curso = json.data.curso;
+                codigoStatus.style.display = 'none';
+                cursoDesbloqueado.innerHTML = `
+                    <h3>${curso.nombre}</h3>
+                    ${curso.descripcion ? `<p>${curso.descripcion}</p>` : ''}
+                    <a href="${curso.drive_url}" target="_blank" rel="noopener noreferrer" class="recurso-button">Abrir curso</a>
+                `;
+                cursoDesbloqueado.style.display = 'block';
+            } else {
+                codigoStatus.className = 'form-status error';
+                codigoStatus.textContent = json.error || 'Código inválido';
+                codigoStatus.style.display = 'block';
+            }
+        } catch (error) {
+            console.error('Error al verificar código:', error);
+            codigoStatus.className = 'form-status error';
+            codigoStatus.textContent = 'No se pudo conectar con el servidor. Intenta más tarde.';
+            codigoStatus.style.display = 'block';
+        }
+    });
+}
+
+// ============================================
 // VERIFICAR ESTADO DE LA API
 // ============================================
 

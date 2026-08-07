@@ -116,6 +116,10 @@ async function main() {
   await db.run(DDL_EVENTOS);
   await db.run(DDL_COMENTARIOS);
 
+  // Tablas de cursos premium y códigos (se crean pero no se borran: son datos del admin)
+  await db.run(ddl.cursos);
+  await db.run(ddl.codigos);
+
   // Migración: asegurar columna estado en comentarios
   if (db.isPostgres) {
     await db.run("ALTER TABLE comentarios ADD COLUMN IF NOT EXISTS estado TEXT NOT NULL DEFAULT 'pendiente'");
