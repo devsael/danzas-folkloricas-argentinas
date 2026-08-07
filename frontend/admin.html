@@ -197,6 +197,7 @@
             <button class="admin-tab-btn" data-tab="eventos">📅 Eventos</button>
             <button class="admin-tab-btn" data-tab="comentarios">💬 Comentarios <span id="pendientes-badge" class="tab-badge" style="display:none;">0</span></button>
             <button class="admin-tab-btn" data-tab="cursos">🎓 Cursos</button>
+            <button class="admin-tab-btn" data-tab="config">⚙️ Configuración</button>
         </div>
 
         <!-- PANEL: AGREGAR DANZA -->
@@ -365,6 +366,41 @@
             <h3 style="font-family: Georgia, serif; color: #8B6F47; margin: 1.5rem 0 1rem;">Códigos Generados</h3>
             <div id="codigos-admin-lista">
                 <p class="loading">Cargando...</p>
+            </div>
+        </div>
+
+        <!-- PANEL: CONFIGURACIÓN -->
+        <div id="panel-config" class="admin-panel">
+            <div class="admin-form-card">
+                <h3>🖼️ Portada (imagen de fondo del inicio)</h3>
+                <p class="admin-hint" style="margin-bottom:1rem;">
+                    Pegá el enlace de tu imagen de portada (carpeta <strong>Portada/</strong> de Drive). Apenas lo guardes, se ve en el sitio.
+                    Dejalo vacío para usar el degradado folklórico original.
+                </p>
+                <form id="form-config" class="form">
+                    <div class="form-group">
+                        <label for="cfg-hero-url">Enlace de la imagen de portada</label>
+                        <input type="text" id="cfg-hero-url" placeholder="https://drive.google.com/uc?export=download&id=...">
+                        <p class="admin-hint">💡 Copiá el enlace de la imagen (lo podés sacar de "Compartir" en Drive) y pegalo acá. Se muestra la miniatura abajo.</p>
+                    </div>
+                    <div class="form-group">
+                        <label>Vista previa de la portada</label>
+                        <div id="cfg-hero-preview" class="config-hero-preview">
+                            <span>Sin imagen (se usa el degradado)</span>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="cfg-drive-url">Enlace del botón "Descargar Curso"</label>
+                        <input type="text" id="cfg-drive-url" placeholder="https://drive.google.com/uc?export=download&id=...">
+                        <p class="admin-hint">💡 El botón verde de la portada aparece solo si ponés un enlace acá. Usá el formato directo de descarga.</p>
+                    </div>
+                    <div class="form-group">
+                        <label for="cfg-drive-texto">Texto del botón (opcional)</label>
+                        <input type="text" id="cfg-drive-texto" maxlength="60" placeholder="📘 Descargar Curso">
+                    </div>
+                    <button type="submit" class="submit-button">Guardar Configuración</button>
+                    <div id="config-status" class="form-status"></div>
+                </form>
             </div>
         </div>
     </div>

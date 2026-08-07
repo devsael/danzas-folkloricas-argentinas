@@ -8,13 +8,14 @@ const API_URL = 'https://danzas-folkloricas-api.onrender.com'; // Backend en Ren
 // ============================================
 // PORTADA DE FONDO
 // ============================================
-// Cambialo cuando quieras: poné la URL de tu imagen de fondo y recargá la página.
-// Dejalo vacío ('') para usar el degradado folklórico original.
-const HERO_BACKGROUND_URL = '';
+// La imagen de portada y el botón de descarga se cargan desde el panel admin
+// (pestaña "Configuración") y se guardan en la base de datos. Si no hay nada
+// configurado, se usa el degradado folklórico original.
 
-const heroPortada = document.querySelector('.hero');
-if (heroPortada && HERO_BACKGROUND_URL) {
-    heroPortada.style.backgroundImage = `linear-gradient(135deg, rgba(139, 111, 71, 0.6) 0%, rgba(193, 65, 12, 0.45) 100%), url('${HERO_BACKGROUND_URL}')`;
+function aplicarPortada(url) {
+    const heroPortada = document.querySelector('.hero');
+    if (!heroPortada || !url) return;
+    heroPortada.style.backgroundImage = `linear-gradient(135deg, rgba(139, 111, 71, 0.6) 0%, rgba(193, 65, 12, 0.45) 100%), url('${url}')`;
     heroPortada.style.backgroundSize = 'cover';
     heroPortada.style.backgroundPosition = 'center';
     heroPortada.style.backgroundAttachment = 'scroll';
@@ -23,20 +24,29 @@ if (heroPortada && HERO_BACKGROUND_URL) {
 // ============================================
 // BOTÓN DE LA PORTADA (Google Drive)
 // ============================================
-// El botón de la portada solo aparece cuando ponés una url.
+// El botón solo aparece cuando la url está configurada en el panel admin.
 // Usá el formato directo de descarga de Drive:
 //   https://drive.google.com/uc?export=download&id=TU_ID_DEL_ARCHIVO
-const HERO_BOTON_DRIVE = {
-    texto: '📘 Descargar Curso',
-    url: '' // 'https://drive.google.com/uc?export=download&id=TU_ID_DEL_ARCHIVO'
-};
 
-function renderBotonDrive() {
+function renderBotonDrive(url, texto) {
     const link = document.getElementById('hero-drive-link');
-    if (!link || !HERO_BOTON_DRIVE.url) return;
-    link.href = HERO_BOTON_DRIVE.url;
-    link.textContent = HERO_BOTON_DRIVE.texto;
+    if (!link || !url) return;
+    link.href = url;
+    link.textContent = texto || '📘 Descargar Curso';
     link.style.display = 'inline-block';
+}
+
+async function cargarConfiguracion() {
+    try {
+        const response = await fetch(`${API_URL}/api/config`);
+        if (!response.ok) return;
+        const json = await response.json();
+        const cfg = json.data || {};
+        aplicarPortada(cfg.hero_background_url);
+        renderBotonDrive(cfg.hero_boton_drive_url, cfg.hero_boton_drive_texto);
+    } catch (error) {
+        console.warn('No se pudo cargar la configuración:', error);
+    }
 }
 
 // Convierte cualquier enlace de Google Drive en una URL de imagen para <img>
@@ -700,8 +710,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Mostrar banner mientras Render despierta en la primera carga
     mostrarDespertando();
 
-    // Botón de descarga de la portada (solo si HERO_BOTON_DRIVE.url está configurada)
-    renderBotonDrive();
+    // Portada y botón de descarga configurados desde el panel admin
+    cargarConfiguracion();
 
     // Recursos (solo se muestra si hay ítems configurados)
     renderRecursos();

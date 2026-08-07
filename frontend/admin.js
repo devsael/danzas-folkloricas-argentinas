@@ -77,6 +77,7 @@ function iniciarAdmin() {
     cargarComentariosAdmin();
     cargarCursosAdmin();
     cargarCodigosAdmin();
+    cargarConfigAdmin();
 }
 
 // ============================================
@@ -740,6 +741,88 @@ async function eliminarCodigo(id, codigo) {
         mostrarEstado('codigo-admin-status', 'No se pudo conectar con el servidor', 'error');
     }
 }
+
+// ============================================
+// CONFIGURACIÓN (portada y botón de descarga)
+// ============================================
+
+const formConfig = document.getElementById('form-config');
+
+function urlImagenPreview(url) {
+    if (!url) return '';
+    const m1 = url.match(/[?&]id=([^&]+)/);
+    const m2 = url.match(/\/d\/([^/]+)/);
+    const id = m1 ? m1[1] : (m2 ? m2[1] : null);
+    if (id) return `https://drive.google.com/thumbnail?id=${id}&sz=w800`;
+    return url;
+}
+
+function actualizarPreviewPortada() {
+    const url = document.getElementById('cfg-hero-url').value.trim();
+    const preview = document.getElementById('cfg-hero-preview');
+    const img = urlImagenPreview(url);
+
+    if (img) {
+        preview.style.backgroundImage = `linear-gradient(135deg, rgba(139, 111, 71, 0.35) 0%, rgba(193, 65, 12, 0.25) 100%), url('${img}')`;
+        preview.textContent = '';
+    } else {
+        preview.style.backgroundImage = '';
+        preview.textContent = 'Sin imagen (se usa el degradado)';
+    }
+}
+
+document.getElementById('cfg-hero-url').addEventListener('input', actualizarPreviewPortada);
+
+async function cargarConfigAdmin() {
+    try {
+        const response = await fetch(`${API_URL}/api/config`);
+        const json = await response.json();
+
+        if (json.success) {
+            const cfg = json.data || {};
+            document.getElementById('cfg-hero-url').value = cfg.hero_background_url || '';
+            document.getElementById('cfg-drive-url').value = cfg.hero_boton_drive_url || '';
+            document.getElementById('cfg-drive-texto').value = cfg.hero_boton_drive_texto || '📘 Descargar Curso';
+            actualizarPreviewPortada();
+        }
+    } catch (error) {
+        console.error(error);
+    }
+}
+
+formConfig.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const body = {
+        hero_background_url: document.getElementById('cfg-hero-url').value.trim(),
+        hero_boton_drive_url: document.getElementById('cfg-drive-url').value.trim(),
+        hero_boton_drive_texto: document.getElementById('cfg-drive-texto').value.trim() || '📘 Descargar Curso'
+    };
+
+    try {
+        const response = await fetch(`${API_URL}/api/config`, {
+            method: 'PUT',
+            headers: adminHeaders(),
+            body: JSON.stringify(body)
+        });
+
+        const json = await response.json();
+
+        if (response.status === 401) {
+            manejarNoAutorizado();
+            return;
+        }
+
+        if (json.success) {
+            mostrarEstado('config-status', '✓ Configuración guardada. Ya se actualizó el sitio.', 'success');
+        } else {
+            mostrarEstado('config-status', `Error: ${json.error}`, 'error');
+        }
+    } catch (error) {
+        console.error(error);
+        mostrarEstado('config-status', 'No se pudo conectar con el servidor', 'error');
+    }
+});
 
 // ============================================
 // MODERACIÓN DE COMENTARIOS

@@ -97,4 +97,9 @@ const codigos = db.isPostgres
       creado TEXT NOT NULL DEFAULT (datetime('now'))
     )`;
 
-module.exports = { danzas, eventos, comentarios, cursos, codigos };
+const config = `CREATE TABLE IF NOT EXISTS config (
+    clave TEXT PRIMARY KEY,
+    valor TEXT
+  )`;
+
+module.exports = { danzas, eventos, comentarios, cursos, codigos, config };

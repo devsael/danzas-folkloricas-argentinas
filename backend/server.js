@@ -472,6 +472,54 @@ app.post('/api/mis-cursos', async (req, res) => {
   }
 });
 
+// ===== CONFIGURACIÓN (portada y botón de la portada) =====
+
+// GET /api/config - Configuración pública (imagen de portada, botón de descarga)
+app.get('/api/config', async (req, res) => {
+  try {
+    const filas = await db.all('SELECT clave, valor FROM config');
+    const config = {};
+    filas.forEach(f => { config[f.clave] = f.valor; });
+
+    res.json({
+      success: true,
+      data: {
+        hero_background_url: config.hero_background_url || '',
+        hero_boton_drive_url: config.hero_boton_drive_url || '',
+        hero_boton_drive_texto: config.hero_boton_drive_texto || '📘 Descargar Curso'
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// PUT /api/config - Actualizar configuración (solo admin)
+app.put('/api/config', requireAdminKey, async (req, res) => {
+  try {
+    const campos = ['hero_background_url', 'hero_boton_drive_url', 'hero_boton_drive_texto'];
+    const recibidos = Object.keys(req.body || {});
+    const validos = recibidos.filter(c => campos.includes(c));
+
+    if (validos.length === 0) {
+      return res.status(400).json({ success: false, error: 'No se recibió ningún campo válido para guardar' });
+    }
+
+    for (const campo of validos) {
+      const valor = typeof req.body[campo] === 'string' ? req.body[campo].trim() : '';
+      await db.run(
+        'INSERT INTO config (clave, valor) VALUES (?, ?) ON CONFLICT(clave) DO UPDATE SET valor = excluded.valor',
+        [campo, valor]
+      );
+    }
+
+    const config = await db.get('SELECT valor FROM config WHERE clave = ?', [validos[0]]);
+    res.json({ success: true, data: { campo: validos[0], valor: config ? config.valor : '' } });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // ===== COMENTARIOS =====
 
 // GET /api/comentarios - Comentarios aprobados (público) con paginación
@@ -637,6 +685,7 @@ async function iniciar() {
     await db.run(ddl.comentarios);
     await db.run(ddl.cursos);
     await db.run(ddl.codigos);
+    await db.run(ddl.config);
 
     await ensureColumn('comentarios', 'estado', "TEXT NOT NULL DEFAULT 'aprobado'");
     await ensureColumn('danzas', 'caracter', "TEXT DEFAULT 'festiva'");
@@ -667,6 +716,8 @@ async function iniciar() {
     console.log(`   POST   /api/codigos             🔒 admin`);
     console.log(`   DELETE /api/codigos/:id         🔒 admin`);
     console.log(`   POST   /api/mis-cursos          🔑 requiere código`);
+    console.log(`   GET    /api/config`);
+    console.log(`   PUT    /api/config              🔒 admin`);
     console.log(`   GET    /api/comentarios?page=&limit=`);
     console.log(`   GET    /api/comentarios/pendientes  🔒 admin`);
     console.log(`   GET    /api/comentarios/rechazados  🔒 admin`);
