@@ -90,6 +90,23 @@ function urlSegura(url) {
     return '';
 }
 
+// Convierte cualquier enlace de YouTube al formato embed (el único que acepta
+// el iframe): watch?v=, youtu.be, shorts y live. Si no es de YouTube, devuelve
+// la URL tal cual (o vacío si no es http/https).
+function urlVideoEmbebible(url) {
+    const u = String(url || '').trim();
+    if (!u) return '';
+
+    const m = u.match(/[?&]v=([^&]+)/);              // youtube.com/watch?v=ID
+    const y = u.match(/youtu\.be\/([^?/]+)/);        // youtu.be/ID
+    const s = u.match(/(?:shorts|live)\/([^?/]+)/);  // youtube.com/shorts/ID, /live/ID
+
+    const id = m ? m[1] : (y ? y[1] : (s ? s[1] : null));
+    if (id) return `https://www.youtube.com/embed/${id}`;
+
+    return /^https?:\/\//i.test(u) ? u : '';
+}
+
 // ============================================
 // CARÁCTER DE LAS DANZAS
 // ============================================
@@ -222,7 +239,7 @@ function abrirModalDanza(id) {
     const videoSection = document.getElementById('video-section');
     const videoContainer = document.getElementById('modal-video');
 
-    const videoUrl = urlSegura(danza.video_url);
+    const videoUrl = urlSegura(urlVideoEmbebible(danza.video_url));
     if (videoUrl) {
         videoContainer.innerHTML = `<iframe src="${videoUrl}" title="Video de ${escapeHtml(danza.nombre)}" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`;
         videoSection.style.display = 'block';
