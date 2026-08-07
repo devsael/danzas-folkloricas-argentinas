@@ -17,6 +17,10 @@ Referencia completa de todos los endpoints disponibles en la API REST.
 - [Cursos Premium](#cursos-premium)
 - [Códigos de Acceso](#códigos-de-acceso)
 - [Mis Cursos](#mis-cursos)
+- [Recursos](#recursos)
+- [Configuración](#configuración)
+- [Visitas y Estadísticas](#visitas-y-estadísticas)
+- [Respaldo y Restauración](#respaldo-y-restauración)
 - [Códigos de Estado](#códigos-de-estado)
 - [Ejemplos cURL](#ejemplos-curl)
 - [Manejo de Errores](#manejo-de-errores)
@@ -102,6 +106,14 @@ ADMIN_KEY=poné-acá-una-clave-secreta-larga-y-única
 | GET | `/api/codigos` | Listar códigos de acceso |
 | POST | `/api/codigos` | Generar código de acceso |
 | DELETE | `/api/codigos/:id` | Eliminar/revocar código |
+| GET | `/api/recursos` | Listar recursos |
+| POST | `/api/recursos` | Crear recurso |
+| PUT | `/api/recursos/:id` | Editar recurso |
+| DELETE | `/api/recursos/:id` | Borrar recurso |
+| PUT | `/api/config` | Actualizar configuración (portada, botón) |
+| GET | `/api/estadisticas` | Totales del sitio (visitas, danzas, etc.) |
+| GET | `/api/backup` | Descargar respaldo completo |
+| POST | `/api/restore` | Restaurar un respaldo |
 
 ---
 
@@ -714,6 +726,144 @@ Content-Type: application/json
 **Errores:**
 - `400 Bad Request` → falta el campo `codigo`
 - `404 Not Found` → el código no existe o fue revocado
+
+---
+
+## 📂 Recursos
+
+Material **gratuito** que se muestra en la sección "Recursos" del sitio (PDFs, libros, galerías de fotos de peñas, carpetas de Drive). Se divide en 3 categorías: `cursos`, `libros` e `imagenes`.
+
+### GET /api/recursos
+
+Lista todos los recursos (público), ordenados por categoría.
+
+**Response (200 OK):**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 1,
+      "categoria": "libros",
+      "titulo": "Manual de Chacarera (PDF)",
+      "descripcion": "Guía completa con historia y pasos.",
+      "url": "https://drive.google.com/uc?export=download&id=ABc123..."
+    }
+  ]
+}
+```
+
+### POST /api/recursos — 🔒 Admin
+
+**Body:**
+- `categoria` (string) - `cursos` | `libros` | `imagenes` [requerido]
+- `titulo` (string) - Título del recurso [requerido]
+- `descripcion` (string) - Descripción [opcional]
+- `url` (string) - Enlace (Drive o URL) [requerido]
+
+### PUT /api/recursos/:id — 🔒 Admin
+
+Edita un recurso existente. Mismos campos que POST.
+
+### DELETE /api/recursos/:id — 🔒 Admin
+
+Elimina un recurso.
+
+---
+
+## ⚙️ Configuración
+
+### GET /api/config
+
+Configuración pública: imagen de portada y botón de la portada.
+
+**Response (200 OK):**
+```json
+{
+  "success": true,
+  "data": {
+    "hero_background_url": "https://drive.google.com/thumbnail?id=1IrSBR...&sz=w1600",
+    "hero_boton_drive_url": "https://drive.google.com/uc?export=download&id=...",
+    "hero_boton_drive_texto": "📘 Descargar Curso"
+  }
+}
+```
+
+### PUT /api/config — 🔒 Admin
+
+Actualiza la configuración. Acepta cualquier combinación de los 3 campos.
+
+**Request:**
+```http
+PUT /api/config HTTP/1.1
+Content-Type: application/json
+X-API-Key: mi-clave-secreta
+
+{ "hero_background_url": "https://drive.google.com/...", "hero_boton_drive_texto": "📘 Descargar Curso" }
+```
+
+---
+
+## 👀 Visitas y Estadísticas
+
+### POST /api/visita
+
+Endpoint **público**: suma una visita. El frontend lo llama una vez por sesión de navegador (via `sessionStorage`), y el servidor limita 60 por IP por hora.
+
+**Response (200 OK):**
+```json
+{ "success": true, "data": { "visitas": 128 } }
+```
+
+### GET /api/estadisticas — 🔒 Admin
+
+Totales del sitio para el panel de administración.
+
+**Response (200 OK):**
+```json
+{
+  "success": true,
+  "data": {
+    "visitas": 128,
+    "danzas": 13,
+    "eventos": 3,
+    "comentariosAprobados": 2,
+    "cursos": 2,
+    "codigosActivos": 5
+  }
+}
+```
+
+---
+
+## 💾 Respaldo y Restauración
+
+### GET /api/backup — 🔒 Admin
+
+Descarga un JSON con **todo** el contenido: danzas, eventos, comentarios, cursos, códigos, configuración y recursos. Guardalo en tu PC como copia de seguridad.
+
+### POST /api/restore — 🔒 Admin
+
+Reemplaza **todos** los datos actuales por el contenido de un respaldo (conserva los ids originales y reinicia las secuencias en PostgreSQL).
+
+**Request:**
+```http
+POST /api/restore HTTP/1.1
+Content-Type: application/json
+X-API-Key: mi-clave-secreta
+
+{ ...contenido completo del JSON de /api/backup... }
+```
+
+**Response (200 OK):**
+```json
+{
+  "success": true,
+  "data": { "restaurados": { "danzas": 13, "eventos": 3, "comentarios": 2, "cursos": 2, "codigos": 5, "config": 3, "recursos": 1 } }
+}
+```
+
+> ⚠️ El restore **borra primero** los datos existentes. Descargá un respaldo antes de restaurar.
 
 ---
 

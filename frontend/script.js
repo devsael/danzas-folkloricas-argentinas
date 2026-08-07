@@ -127,23 +127,70 @@ function badgeCaracter(caracter) {
 }
 
 // ============================================
-// RECURSOS (GOOGLE DRIVE)
+// RECURSOS (se administran desde el panel admin)
 // ============================================
-// Configurá acá los enlaces de tu Google Drive. La sección "Recursos" solo
-// aparece en la página cuando hay al menos un ítem cargado.
-// Cada ítem: { titulo, descripcion, url }
-const RECURSOS = {
-    cursos: [
-        // { titulo: 'Curso de Chacarera', descripcion: 'Material completo con pasos y ejercicios.', url: 'https://drive.google.com/...' },
-        // { titulo: 'Curso de Zamba', descripcion: 'Videos y guías del nivel inicial.', url: 'https://drive.google.com/...' }
-    ],
-    libros: [
-        // { titulo: 'Manual de Danzas Folklóricas', descripcion: 'Compendio en PDF con historia y coreografías.', url: 'https://drive.google.com/...' }
-    ],
-    imagenes: [
-        // { titulo: 'Galería de Peñas y Festividades', descripcion: 'Fotos de eventos y presentaciones.', url: 'https://drive.google.com/...' }
-    ]
-};
+
+async function cargarRecursos() {
+    const seccion = document.getElementById('recursos');
+    const contenedor = document.getElementById('recursos-lista');
+    if (!seccion || !contenedor) return;
+
+    let items = [];
+    try {
+        const response = await fetch(`${API_URL}/api/recursos`);
+        const json = await response.json();
+        if (json.success) items = json.data || [];
+    } catch (error) {
+        // si falla la API, no se muestra la sección
+    }
+
+    const categorias = [
+        { clave: 'cursos', titulo: 'Cursos y Talleres', icono: '🎓' },
+        { clave: 'libros', titulo: 'Bibliografía y Libros', icono: '📚' },
+        { clave: 'imagenes', titulo: 'Galería de Imágenes', icono: '🖼️' }
+    ];
+
+    const html = categorias.map(cat => {
+        const catItems = items.filter(i => i.categoria === cat.clave);
+        if (catItems.length === 0) return '';
+
+        const cards = catItems.map(item => `
+            <div class="recurso-card">
+                <h4>${escapeHtml(item.titulo)}</h4>
+                ${item.descripcion ? `<p>${escapeHtml(item.descripcion)}</p>` : ''}
+                <a href="${urlSegura(item.url)}" target="_blank" rel="noopener noreferrer" class="recurso-button">Abrir en Google Drive</a>
+            </div>
+        `).join('');
+
+        return `
+            <div class="recursos-categoria">
+                <h3>${cat.icono} ${cat.titulo}</h3>
+                <div class="recursos-grid">${cards}</div>
+            </div>
+        `;
+    }).join('');
+
+    if (!html.trim()) {
+        seccion.style.display = 'none';
+        return;
+    }
+
+    contenedor.innerHTML = html;
+    seccion.style.display = 'block';
+}
+
+// ============================================
+// CONTADOR DE VISITAS
+// ============================================
+// Se cuenta una visita por sesión de navegador (sessionStorage), así las
+// recargas no inflan el número. El servidor hace el resto del control.
+const VISITA_CONTADA_KEY = 'danzas_visita_contada';
+
+function contarVisita() {
+    if (sessionStorage.getItem(VISITA_CONTADA_KEY)) return;
+    sessionStorage.setItem(VISITA_CONTADA_KEY, '1');
+    fetch(`${API_URL}/api/visita`, { method: 'POST' }).catch(() => {});
+}
 
 // ============================================
 // NAVEGACIÓN
@@ -515,50 +562,6 @@ function renderPaginacion(containerId, pagination, callback) {
 }
 
 // ============================================
-// RECURSOS
-// ============================================
-
-function renderRecursos() {
-    const seccion = document.getElementById('recursos');
-    const contenedor = document.getElementById('recursos-lista');
-    if (!seccion || !contenedor) return;
-
-    const categorias = [
-        { clave: 'cursos', titulo: 'Cursos y Talleres', icono: '🎓' },
-        { clave: 'libros', titulo: 'Bibliografía y Libros', icono: '📚' },
-        { clave: 'imagenes', titulo: 'Galería de Imágenes', icono: '🖼️' }
-    ];
-
-    const html = categorias.map(cat => {
-        const items = RECURSOS[cat.clave] || [];
-        if (items.length === 0) return '';
-
-        const cards = items.map(item => `
-            <div class="recurso-card">
-                <h4>${escapeHtml(item.titulo)}</h4>
-                ${item.descripcion ? `<p>${escapeHtml(item.descripcion)}</p>` : ''}
-                <a href="${urlSegura(item.url)}" target="_blank" rel="noopener noreferrer" class="recurso-button">Abrir en Google Drive</a>
-            </div>
-        `).join('');
-
-        return `
-            <div class="recursos-categoria">
-                <h3>${cat.icono} ${cat.titulo}</h3>
-                <div class="recursos-grid">${cards}</div>
-            </div>
-        `;
-    }).join('');
-
-    if (!html.trim()) {
-        seccion.style.display = 'none';
-        return;
-    }
-
-    contenedor.innerHTML = html;
-    seccion.style.display = 'block';
-}
-
-// ============================================
 // LAZY LOADING
 // ============================================
 
@@ -799,8 +802,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Portada y botón de descarga configurados desde el panel admin
     cargarConfiguracion();
 
-    // Recursos (solo se muestra si hay ítems configurados)
-    renderRecursos();
+    // Recursos (solo se muestra si hay ítems cargados en el panel admin)
+    cargarRecursos();
+
+    // Contar esta visita (una por sesión)
+    contarVisita();
 
     // Lazy loading para imágenes con data-src
     initLazyImages();

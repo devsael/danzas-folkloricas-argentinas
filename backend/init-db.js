@@ -123,6 +123,9 @@ async function main() {
   // Tabla de configuración (portada, botón de descarga): también se respeta
   await db.run(ddl.config);
 
+  // Tabla de recursos (material gratis)
+  await db.run(ddl.recursos);
+
   // Migración: asegurar columna estado en comentarios
   if (db.isPostgres) {
     await db.run("ALTER TABLE comentarios ADD COLUMN IF NOT EXISTS estado TEXT NOT NULL DEFAULT 'pendiente'");

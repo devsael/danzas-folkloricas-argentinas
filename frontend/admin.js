@@ -77,7 +77,9 @@ function iniciarAdmin() {
     cargarComentariosAdmin();
     cargarCursosAdmin();
     cargarCodigosAdmin();
+    cargarRecursosAdmin();
     cargarConfigAdmin();
+    cargarEstadisticas();
 }
 
 // ============================================
@@ -763,6 +765,198 @@ async function eliminarCodigo(id) {
     } catch (error) {
         console.error(error);
         mostrarEstado('codigo-admin-status', 'No se pudo conectar con el servidor', 'error');
+    }
+}
+
+// ============================================
+// RECURSOS (material gratis del sitio)
+// ============================================
+
+const formRecurso = document.getElementById('form-recurso');
+const recursoCancelBtn = document.getElementById('recurso-cancel-btn');
+const recursoFormTitle = document.getElementById('recurso-form-title');
+
+let recursosCache = [];
+
+const ETIQUETAS_CATEGORIA = {
+    'cursos': '🎓 Cursos y Talleres',
+    'libros': '📚 Bibliografía y Libros',
+    'imagenes': '🖼️ Galería de Imágenes'
+};
+
+async function cargarRecursosAdmin() {
+    const lista = document.getElementById('recursos-admin-lista');
+    try {
+        const response = await fetch(`${API_URL}/api/recursos`);
+
+        if (response.status === 401) {
+            manejarNoAutorizado();
+            return;
+        }
+
+        const json = await response.json();
+
+        if (json.success && json.data.length > 0) {
+            recursosCache = json.data;
+            lista.innerHTML = json.data.map(r => `
+                <div class="admin-list-item">
+                    <div class="admin-list-content">
+                        <h4>${(ETIQUETAS_CATEGORIA[r.categoria] || r.categoria)} · ${escapeHtml(r.titulo)}</h4>
+                        <p>${r.descripcion ? escapeHtml(r.descripcion.substring(0, 120)) + (r.descripcion.length > 120 ? '...' : '') : ''}</p>
+                        <p style="font-size:0.8rem; color:#999;">🔗 ${escapeHtml(r.url)}</p>
+                    </div>
+                    <div class="admin-list-actions">
+                        <button class="admin-action-btn btn-editar" onclick="editarRecurso(${r.id})">Editar</button>
+                        <button class="admin-action-btn btn-eliminar" onclick="eliminarRecurso(${r.id})">Eliminar</button>
+                    </div>
+                </div>
+            `).join('');
+        } else {
+            recursosCache = [];
+            lista.innerHTML = '<p class="loading">Todavía no hay recursos cargados</p>';
+        }
+    } catch (error) {
+        console.error(error);
+        lista.innerHTML = '<p class="loading">⚠️ No se pudo conectar con el servidor</p>';
+    }
+}
+
+formRecurso.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const id = document.getElementById('r-id').value;
+    const categoria = document.getElementById('r-categoria').value;
+    const titulo = document.getElementById('r-titulo').value.trim();
+    const descripcion = document.getElementById('r-descripcion').value.trim();
+    const url = document.getElementById('r-url').value.trim();
+
+    if (!titulo || !url) {
+        mostrarEstado('recurso-status', 'Título y enlace son obligatorios', 'error');
+        return;
+    }
+
+    try {
+        const body = { categoria, titulo, descripcion, url };
+        const method = id ? 'PUT' : 'POST';
+        const endpoint = id ? `${API_URL}/api/recursos/${id}` : `${API_URL}/api/recursos`;
+
+        const response = await fetch(endpoint, {
+            method,
+            headers: adminHeaders(),
+            body: JSON.stringify(body)
+        });
+
+        const json = await response.json();
+
+        if (response.status === 401) {
+            manejarNoAutorizado();
+            return;
+        }
+
+        if (json.success) {
+            mostrarEstado('recurso-status', id ? '✓ Recurso actualizado' : '✓ Recurso guardado. Ya se ve en el sitio.', 'success');
+            formRecurso.reset();
+            document.getElementById('r-id').value = '';
+            recursoCancelBtn.style.display = 'none';
+            recursoFormTitle.textContent = 'Nuevo Recurso';
+            cargarRecursosAdmin();
+        } else {
+            mostrarEstado('recurso-status', `Error: ${json.error}`, 'error');
+        }
+    } catch (error) {
+        console.error(error);
+        mostrarEstado('recurso-status', 'No se pudo conectar con el servidor', 'error');
+    }
+});
+
+function editarRecurso(id) {
+    const r = recursosCache.find(x => x.id === id);
+    if (!r) return;
+
+    document.getElementById('r-id').value = r.id;
+    document.getElementById('r-categoria').value = r.categoria;
+    document.getElementById('r-titulo').value = r.titulo;
+    document.getElementById('r-descripcion').value = r.descripcion || '';
+    document.getElementById('r-url').value = r.url;
+
+    recursoFormTitle.textContent = `Editar Recurso: ${r.titulo}`;
+    recursoCancelBtn.style.display = 'inline-block';
+    recursoFormTitle.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+recursoCancelBtn.addEventListener('click', () => {
+    formRecurso.reset();
+    document.getElementById('r-id').value = '';
+    recursoCancelBtn.style.display = 'none';
+    recursoFormTitle.textContent = 'Nuevo Recurso';
+});
+
+async function eliminarRecurso(id) {
+    const r = recursosCache.find(x => x.id === id);
+    const nombre = r ? r.titulo : '';
+
+    if (!confirm(`¿Eliminar el recurso "${nombre}"? Esta acción no se puede deshacer.`)) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_URL}/api/recursos/${id}`, {
+            method: 'DELETE',
+            headers: { 'X-API-Key': getAdminKey() }
+        });
+        const json = await response.json();
+
+        if (response.status === 401) {
+            manejarNoAutorizado();
+            return;
+        }
+
+        if (json.success) {
+            mostrarEstado('recurso-status', '✓ Recurso eliminado', 'success');
+            cargarRecursosAdmin();
+        } else {
+            mostrarEstado('recurso-status', `Error: ${json.error}`, 'error');
+        }
+    } catch (error) {
+        console.error(error);
+        mostrarEstado('recurso-status', 'No se pudo conectar con el servidor', 'error');
+    }
+}
+
+// ============================================
+// ESTADÍSTICAS
+// ============================================
+
+async function cargarEstadisticas() {
+    const grid = document.getElementById('estadisticas-grid');
+    if (!grid) return;
+
+    try {
+        const response = await fetch(`${API_URL}/api/estadisticas`, { headers: { 'X-API-Key': getAdminKey() } });
+
+        if (response.status === 401) {
+            manejarNoAutorizado();
+            return;
+        }
+
+        const json = await response.json();
+
+        if (json.success) {
+            const s = json.data;
+            grid.innerHTML = `
+                <div class="estadistica-item"><div class="num">${s.visitas}</div><div class="lbl">👀 Visitas</div></div>
+                <div class="estadistica-item"><div class="num">${s.danzas}</div><div class="lbl">💃 Danzas</div></div>
+                <div class="estadistica-item"><div class="num">${s.eventos}</div><div class="lbl">📅 Eventos</div></div>
+                <div class="estadistica-item"><div class="num">${s.comentariosAprobados}</div><div class="lbl">💬 Comentarios</div></div>
+                <div class="estadistica-item"><div class="num">${s.cursos}</div><div class="lbl">🎓 Cursos</div></div>
+                <div class="estadistica-item"><div class="num">${s.codigosActivos}</div><div class="lbl">🔑 Códigos activos</div></div>
+            `;
+        } else {
+            grid.innerHTML = '<p class="loading">No se pudieron cargar las estadísticas</p>';
+        }
+    } catch (error) {
+        console.error(error);
+        grid.innerHTML = '<p class="loading">⚠️ No se pudo conectar con el servidor</p>';
     }
 }
 

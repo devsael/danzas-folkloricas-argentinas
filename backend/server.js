@@ -581,18 +581,153 @@ app.put('/api/config', requireAdminKey, async (req, res) => {
   }
 });
 
+// ===== RECURSOS (material gratis: cursos, libros, galerías) =====
+
+// GET /api/recursos - Listar recursos públicos (libros, galerías, material libre)
+app.get('/api/recursos', async (req, res) => {
+  try {
+    const recursos = await db.all(
+      "SELECT * FROM recursos ORDER BY CASE categoria WHEN 'cursos' THEN 1 WHEN 'libros' THEN 2 ELSE 3 END, lower(titulo) ASC"
+    );
+    res.json({ success: true, data: recursos });
+  } catch (error) {
+    return handleError(res, error, req);
+  }
+});
+
+// POST /api/recursos - Crear un recurso (solo admin)
+app.post('/api/recursos', requireAdminKey, async (req, res) => {
+  try {
+    const { categoria, titulo, descripcion, url } = req.body;
+
+    if (!['cursos', 'libros', 'imagenes'].includes(categoria)) {
+      return res.status(400).json({ success: false, error: 'Categoría inválida (use cursos, libros o imagenes)' });
+    }
+    if (!titulo || !url) {
+      return res.status(400).json({ success: false, error: 'Título y enlace son obligatorios' });
+    }
+
+    const result = await db.run(
+      'INSERT INTO recursos (categoria, titulo, descripcion, url) VALUES (?, ?, ?, ?)',
+      [categoria, titulo, descripcion || '', url]
+    );
+
+    res.status(201).json({
+      success: true,
+      data: { id: result.lastID, categoria, titulo, descripcion, url }
+    });
+  } catch (error) {
+    return handleError(res, error, req);
+  }
+});
+
+// PUT /api/recursos/:id - Editar un recurso (solo admin)
+app.put('/api/recursos/:id', requireAdminKey, validarId, async (req, res) => {
+  try {
+    const { categoria, titulo, descripcion, url } = req.body;
+
+    if (!['cursos', 'libros', 'imagenes'].includes(categoria)) {
+      return res.status(400).json({ success: false, error: 'Categoría inválida (use cursos, libros o imagenes)' });
+    }
+    if (!titulo || !url) {
+      return res.status(400).json({ success: false, error: 'Título y enlace son obligatorios' });
+    }
+
+    const existente = await db.get('SELECT * FROM recursos WHERE id = ?', [req.params.id]);
+    if (!existente) {
+      return res.status(404).json({ success: false, error: 'Recurso no encontrado' });
+    }
+
+    await db.run(
+      'UPDATE recursos SET categoria = ?, titulo = ?, descripcion = ?, url = ? WHERE id = ?',
+      [categoria, titulo, descripcion || '', url, req.params.id]
+    );
+
+    res.json({ success: true, data: { id: Number(req.params.id), categoria, titulo, descripcion, url } });
+  } catch (error) {
+    return handleError(res, error, req);
+  }
+});
+
+// DELETE /api/recursos/:id - Eliminar un recurso (solo admin)
+app.delete('/api/recursos/:id', requireAdminKey, validarId, async (req, res) => {
+  try {
+    const existente = await db.get('SELECT * FROM recursos WHERE id = ?', [req.params.id]);
+    if (!existente) {
+      return res.status(404).json({ success: false, error: 'Recurso no encontrado' });
+    }
+
+    await db.run('DELETE FROM recursos WHERE id = ?', [req.params.id]);
+    res.json({ success: true, data: { id: Number(req.params.id) } });
+  } catch (error) {
+    return handleError(res, error, req);
+  }
+});
+
+// ===== VISITAS Y ESTADÍSTICAS =====
+
+// POST /api/visita - Suma una visita (público). Se cuenta una vez por sesión
+// desde el navegador (el frontend lo evita con sessionStorage) y el rate limit
+// protege contra bots.
+app.post('/api/visita', rateLimit(60, 3600000), async (req, res) => {
+  try {
+    const actual = await db.get("SELECT valor FROM config WHERE clave = 'visitas'");
+    const n = (actual && parseInt(actual.valor, 10)) || 0;
+    const nuevo = n + 1;
+
+    await db.run(
+      "INSERT INTO config (clave, valor) VALUES ('visitas', ?) ON CONFLICT(clave) DO UPDATE SET valor = excluded.valor",
+      [String(nuevo)],
+      { returning: false }
+    );
+
+    res.json({ success: true, data: { visitas: nuevo } });
+  } catch (error) {
+    return handleError(res, error, req);
+  }
+});
+
+// GET /api/estadisticas - Totales del sitio (solo admin)
+app.get('/api/estadisticas', requireAdminKey, async (req, res) => {
+  try {
+    const [danzas, eventos, comentarios, cursos, codigos, visitas] = await Promise.all([
+      db.get('SELECT COUNT(*) AS n FROM danzas'),
+      db.get('SELECT COUNT(*) AS n FROM eventos'),
+      db.get("SELECT COUNT(*) AS n FROM comentarios WHERE estado = 'aprobado'"),
+      db.get('SELECT COUNT(*) AS n FROM cursos'),
+      db.get("SELECT COUNT(*) AS n FROM codigos WHERE estado = 'activo'"),
+      db.get("SELECT valor FROM config WHERE clave = 'visitas'")
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        danzas: Number(danzas.n) || 0,
+        eventos: Number(eventos.n) || 0,
+        comentariosAprobados: Number(comentarios.n) || 0,
+        cursos: Number(cursos.n) || 0,
+        codigosActivos: Number(codigos.n) || 0,
+        visitas: (visitas && parseInt(visitas.valor, 10)) || 0
+      }
+    });
+  } catch (error) {
+    return handleError(res, error, req);
+  }
+});
+
 // ===== RESPALDO (exportar / restaurar) =====
 
 // GET /api/backup - Descarga un JSON con todos los datos (solo admin)
 app.get('/api/backup', requireAdminKey, rateLimit(10, 60000), async (req, res) => {
   try {
-    const [danzas, eventos, comentarios, cursos, codigos, config] = await Promise.all([
+    const [danzas, eventos, comentarios, cursos, codigos, config, recursos] = await Promise.all([
       db.all('SELECT * FROM danzas ORDER BY id ASC'),
       db.all('SELECT * FROM eventos ORDER BY id ASC'),
       db.all('SELECT * FROM comentarios ORDER BY id ASC'),
       db.all('SELECT * FROM cursos ORDER BY id ASC'),
       db.all('SELECT * FROM codigos ORDER BY id ASC'),
-      db.all('SELECT * FROM config ORDER BY clave ASC')
+      db.all('SELECT * FROM config ORDER BY clave ASC'),
+      db.all('SELECT * FROM recursos ORDER BY id ASC')
     ]);
 
     res.json({
@@ -601,7 +736,7 @@ app.get('/api/backup', requireAdminKey, rateLimit(10, 60000), async (req, res) =
         app: 'danzas-folkloricas-argentinas',
         version: 1,
         generado: new Date().toISOString(),
-        danzas, eventos, comentarios, cursos, codigos, config
+        danzas, eventos, comentarios, cursos, codigos, config, recursos
       }
     });
   } catch (error) {
@@ -628,6 +763,7 @@ app.post('/api/restore', requireAdminKey, rateLimit(3, 60000), async (req, res) 
     await db.run('DELETE FROM eventos');
     await db.run('DELETE FROM danzas');
     await db.run('DELETE FROM config');
+    await db.run('DELETE FROM recursos');
 
     // Reinsertar con los ids originales
     for (const d of danzasArr) {
@@ -667,10 +803,16 @@ app.post('/api/restore', requireAdminKey, rateLimit(3, 60000), async (req, res) 
         { returning: false }
       );
     }
+    for (const r of b('recursos')) {
+      await db.run(
+        'INSERT INTO recursos (id, categoria, titulo, descripcion, url) VALUES (?, ?, ?, ?, ?)',
+        [r.id, r.categoria, r.titulo, r.descripcion || null, r.url]
+      );
+    }
 
     // Reiniciar secuencias en PostgreSQL para que los próximos inserts no colisionen
     if (db.isPostgres) {
-      for (const tabla of ['danzas', 'eventos', 'comentarios', 'cursos', 'codigos']) {
+      for (const tabla of ['danzas', 'eventos', 'comentarios', 'cursos', 'codigos', 'recursos']) {
         await db.run(`SELECT setval(pg_get_serial_sequence('${tabla}', 'id'), COALESCE((SELECT MAX(id) FROM ${tabla}), 1), true)`);
       }
     }
@@ -684,7 +826,8 @@ app.post('/api/restore', requireAdminKey, rateLimit(3, 60000), async (req, res) 
           comentarios: b('comentarios').length,
           cursos: b('cursos').length,
           codigos: b('codigos').length,
-          config: b('config').length
+          config: b('config').length,
+          recursos: b('recursos').length
         }
       }
     });
@@ -859,6 +1002,7 @@ async function iniciar() {
     await db.run(ddl.cursos);
     await db.run(ddl.codigos);
     await db.run(ddl.config);
+    await db.run(ddl.recursos);
 
     await ensureColumn('comentarios', 'estado', "TEXT NOT NULL DEFAULT 'aprobado'");
     await ensureColumn('danzas', 'caracter', "TEXT DEFAULT 'festiva'");
@@ -889,6 +1033,12 @@ async function iniciar() {
     console.log(`   POST   /api/codigos             🔒 admin`);
     console.log(`   DELETE /api/codigos/:id         🔒 admin`);
     console.log(`   POST   /api/mis-cursos          🔑 requiere código`);
+    console.log(`   GET    /api/recursos`);
+    console.log(`   POST   /api/recursos            🔒 admin`);
+    console.log(`   PUT    /api/recursos/:id        🔒 admin`);
+    console.log(`   DELETE /api/recursos/:id        🔒 admin`);
+    console.log(`   POST   /api/visita`);
+    console.log(`   GET    /api/estadisticas        🔒 admin`);
     console.log(`   GET    /api/config`);
     console.log(`   PUT    /api/config              🔒 admin`);
     console.log(`   GET    /api/backup              🔒 admin`);

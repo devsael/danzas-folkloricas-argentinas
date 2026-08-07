@@ -102,4 +102,20 @@ const config = `CREATE TABLE IF NOT EXISTS config (
     valor TEXT
   )`;
 
-module.exports = { danzas, eventos, comentarios, cursos, codigos, config };
+const recursos = db.isPostgres
+  ? `CREATE TABLE IF NOT EXISTS recursos (
+      id SERIAL PRIMARY KEY,
+      categoria TEXT NOT NULL,
+      titulo TEXT NOT NULL,
+      descripcion TEXT,
+      url TEXT NOT NULL
+    )`
+  : `CREATE TABLE IF NOT EXISTS recursos (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      categoria TEXT NOT NULL,
+      titulo TEXT NOT NULL,
+      descripcion TEXT,
+      url TEXT NOT NULL
+    )`;
+
+module.exports = { danzas, eventos, comentarios, cursos, codigos, config, recursos };
