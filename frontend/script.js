@@ -15,10 +15,20 @@ const API_URL = 'https://danzas-folkloricas-api.onrender.com'; // Backend en Ren
 function aplicarPortada(url) {
     const heroPortada = document.querySelector('.hero');
     if (!heroPortada || !url) return;
-    heroPortada.style.backgroundImage = `linear-gradient(135deg, rgba(139, 111, 71, 0.6) 0%, rgba(193, 65, 12, 0.45) 100%), url('${url}')`;
+    const bgUrl = urlParaFondo(url);
+    heroPortada.style.backgroundImage = `linear-gradient(135deg, rgba(139, 111, 71, 0.6) 0%, rgba(193, 65, 12, 0.45) 100%), url('${bgUrl}')`;
     heroPortada.style.backgroundSize = 'cover';
     heroPortada.style.backgroundPosition = 'center';
     heroPortada.style.backgroundAttachment = 'scroll';
+}
+
+// Convierte un enlace de Drive en una URL de imagen grande para fondo de pantalla
+function urlParaFondo(url) {
+    const m1 = url.match(/[?&]id=([^&]+)/);
+    const m2 = url.match(/\/d\/([^/]+)/);
+    const id = m1 ? m1[1] : (m2 ? m2[1] : null);
+    if (id) return `https://drive.google.com/thumbnail?id=${id}&sz=w1600`;
+    return url;
 }
 
 // ============================================
