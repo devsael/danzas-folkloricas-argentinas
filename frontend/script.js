@@ -548,30 +548,10 @@ async function verificarAPI() {
             timeout: 5000
         });
 
-        if (response.ok) {
-            actualizarEstadoAPI('online');
-            return true;
-        } else {
-            actualizarEstadoAPI('offline');
-            return false;
-        }
+        return response.ok;
     } catch (error) {
         console.error('Error al verificar API:', error);
-        actualizarEstadoAPI('offline');
         return false;
-    }
-}
-
-function actualizarEstadoAPI(estado) {
-    const badge = document.getElementById('api-status');
-    if (badge) {
-        if (estado === 'online') {
-            badge.className = 'status-badge online';
-            badge.textContent = '✓ Conectado';
-        } else {
-            badge.className = 'status-badge offline';
-            badge.textContent = '✗ Sin conexión';
-        }
     }
 }
 
@@ -596,9 +576,9 @@ function mostrarErrorConexion() {
     banner.innerHTML = `
         <span class="wake-icon">⚠️</span>
         <div class="wake-text">
-            <p><strong>No se pudo conectar con el servidor.</strong></p>
-            <p>Puede estar despertando (Render Free tarda entre 20 y 60 segundos) o estar momentáneamente caído.</p>
-            <button id="btn-reintentar" class="wake-retry">Reintentar ahora</button>
+            <p><strong>No se pudo cargar la página.</strong></p>
+            <p>El servidor puede estar despertando. Intentalo de nuevo.</p>
+            <button id="btn-reintentar" class="wake-retry">Reintentar</button>
         </div>`;
     banner.style.display = 'flex';
 
