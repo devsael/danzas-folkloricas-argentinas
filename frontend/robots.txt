@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /admin.html
+
+Sitemap: https://devsael.github.io/danzas-folkloricas-argentinas/sitemap.xml
