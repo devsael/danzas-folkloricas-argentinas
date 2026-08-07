@@ -238,7 +238,33 @@ body {
 
 .cta-outline:hover {
     background: rgba(254, 251, 247, 0.15);
-    box-shadow: none;
+}
+
+.cta-contacto {
+    display: inline-block;
+    background: var(--color-accent);
+    color: #FEFBF7;
+    padding: 0.8rem 2rem;
+    font-size: 1.05rem;
+    border-radius: 50px;
+    font-weight: bold;
+    text-decoration: none;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    transition: var(--transition);
+}
+
+.cta-contacto:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+}
+
+.plan-contacto {
+    text-align: center;
+    margin-top: var(--spacing-xl);
+}
+
+.crear-evento .cta-contacto {
+    margin-top: var(--spacing-md);
 }
 
 .cta-drive {
