@@ -30,9 +30,12 @@ if (isPostgres) {
   db = {
     isPostgres: true,
 
-    async run(sql, params = []) {
+    async run(sql, params = [], opts = {}) {
       let query = sqlToPg(sql);
-      if (/\bINSERT\b/i.test(query) && !/RETURNING/i.test(query)) {
+      // Solo se agrega RETURNING id si la tabla tiene columna id (por ej. la
+      // tabla config usa clave/valor y no tiene id). Se puede desactivar con
+      // opts.returning = false.
+      if (/\bINSERT\b/i.test(query) && !/RETURNING/i.test(query) && opts.returning !== false) {
         query += ' RETURNING id';
       }
       const result = await pool.query(query, params);

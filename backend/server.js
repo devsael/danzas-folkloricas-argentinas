@@ -8,8 +8,21 @@ require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Render usa un proxy: confiamos en el header X-Forwarded-For para que req.ip
+// sea la IP real del visitante (necesario para el rate limiting).
+app.set('trust proxy', 1);
+
 // Clave de administrador. En producción definila en una variable de entorno ADMIN_KEY.
+// Si falta en producción, no arranca: así no quedamos con la clave de desarrollo pública.
+const esProduccion = process.env.NODE_ENV === 'production';
 const ADMIN_KEY = process.env.ADMIN_KEY || 'danzas-admin-dev-key-2025';
+
+if (!process.env.ADMIN_KEY && esProduccion) {
+  console.error('🚨 ADMIN_KEY no está definida. El servidor no arranca en producción sin la clave de administrador.');
+  console.error('   Configurala en Render → Environment → ADMIN_KEY.');
+  process.exit(1);
+}
+
 if (!process.env.ADMIN_KEY) {
   console.warn('⚠️  ADMIN_KEY no definida. Usando clave de desarrollo. Definila en .env o en la variable de entorno del servidor.');
 }
@@ -62,6 +75,53 @@ function paginacionRespuesta(total, page, limit) {
   return { page, limit, total, totalPages: Math.ceil(total / limit) };
 }
 
+// Escapa caracteres comodín de LIKE (%, _) para que la búsqueda los trate literal
+function escapeLike(s) {
+  return String(s).replace(/[\\%_]/g, (m) => `\\${m}`);
+}
+
+// Valida que :id sea un número entero
+function validarId(req, res, next) {
+  if (!/^\d+$/.test(req.params.id || '')) {
+    return res.status(400).json({ success: false, error: 'El id debe ser un número entero' });
+  }
+  next();
+}
+
+// Devuelve error genérico al cliente y loguea el detalle en el servidor
+function handleError(res, error, req) {
+  console.error(`[${new Date().toISOString()}] Error en ${req.method} ${req.originalUrl}:`, error.message);
+  res.status(500).json({ success: false, error: 'Error interno del servidor' });
+}
+
+// Rate limiting simple en memoria (sin dependencias).
+// Limita la cantidad de requests por IP por ventana de tiempo.
+const rateHits = new Map();
+
+function rateLimit(max, ventanaMs) {
+  return (req, res, next) => {
+    const ip = req.ip || req.socket.remoteAddress || 'unknown';
+    const ahora = Date.now();
+    let datos = rateHits.get(ip);
+
+    if (!datos || ahora > datos.resetsAt) {
+      datos = { count: 0, resetsAt: ahora + ventanaMs };
+    }
+
+    datos.count += 1;
+    rateHits.set(ip, datos);
+
+    if (rateHits.size > 10000) {
+      rateHits.clear();
+    }
+
+    if (datos.count > max) {
+      return res.status(429).json({ success: false, error: 'Demasiadas solicitudes. Esperá un momento y volvé a intentar.' });
+    }
+    next();
+  };
+}
+
 // ============= RUTAS =============
 
 // Health check
@@ -79,8 +139,8 @@ app.get('/api/danzas', async (req, res) => {
     const { page, limit, offset } = getPagination(req, 12, 50);
 
     const op = db.isPostgres ? 'ILIKE' : 'LIKE';
-    const where = search ? `WHERE nombre ${op} ?` : '';
-    const params = search ? [`%${search}%`] : [];
+    const where = search ? `WHERE nombre ${op} ? ESCAPE '\\'` : '';
+    const params = search ? [`%${escapeLike(search)}%`] : [];
 
     const countRow = await db.get(`SELECT COUNT(*) AS total FROM danzas ${where}`, params);
     const total = countRow ? countRow.total : 0;
@@ -96,12 +156,12 @@ app.get('/api/danzas', async (req, res) => {
       pagination: paginacionRespuesta(total, page, limit)
     });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    return handleError(res, error, req);
   }
 });
 
 // GET /api/danzas/:id - Obtener una danza específica
-app.get('/api/danzas/:id', async (req, res) => {
+app.get('/api/danzas/:id', validarId, async (req, res) => {
   try {
     const danza = await db.get('SELECT * FROM danzas WHERE id = ?', [req.params.id]);
     if (!danza) {
@@ -109,7 +169,7 @@ app.get('/api/danzas/:id', async (req, res) => {
     }
     res.json({ success: true, data: danza });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    return handleError(res, error, req);
   }
 });
 
@@ -133,12 +193,12 @@ app.post('/api/danzas', requireAdminKey, async (req, res) => {
       data: { id: result.lastID, nombre, region, caracter: caracter || 'festiva', historia, coreografia, video_url, imagen_url }
     });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    return handleError(res, error, req);
   }
 });
 
 // PUT /api/danzas/:id - Editar una danza existente (solo para admin)
-app.put('/api/danzas/:id', requireAdminKey, async (req, res) => {
+app.put('/api/danzas/:id', requireAdminKey, validarId, async (req, res) => {
   try {
     const { nombre, region, caracter, historia, coreografia, video_url, imagen_url } = req.body;
 
@@ -162,12 +222,12 @@ app.put('/api/danzas/:id', requireAdminKey, async (req, res) => {
       data: { id: Number(req.params.id), nombre, region, caracter: caracter || 'festiva', historia, coreografia, video_url, imagen_url }
     });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    return handleError(res, error, req);
   }
 });
 
 // DELETE /api/danzas/:id - Eliminar una danza (solo para admin)
-app.delete('/api/danzas/:id', requireAdminKey, async (req, res) => {
+app.delete('/api/danzas/:id', requireAdminKey, validarId, async (req, res) => {
   try {
     const existente = await db.get('SELECT * FROM danzas WHERE id = ?', [req.params.id]);
     if (!existente) {
@@ -177,7 +237,7 @@ app.delete('/api/danzas/:id', requireAdminKey, async (req, res) => {
     await db.run('DELETE FROM danzas WHERE id = ?', [req.params.id]);
     res.json({ success: true, data: { id: Number(req.params.id) } });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    return handleError(res, error, req);
   }
 });
 
@@ -203,7 +263,7 @@ app.get('/api/eventos', async (req, res) => {
       pagination: paginacionRespuesta(total, page, limit)
     });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    return handleError(res, error, req);
   }
 });
 
@@ -232,12 +292,12 @@ app.post('/api/eventos', requireAdminKey, async (req, res) => {
       data: { id: result.lastID, titulo, fecha, lugar, descripcion }
     });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    return handleError(res, error, req);
   }
 });
 
 // PUT /api/eventos/:id - Editar un evento existente (solo para admin)
-app.put('/api/eventos/:id', requireAdminKey, async (req, res) => {
+app.put('/api/eventos/:id', requireAdminKey, validarId, async (req, res) => {
   try {
     const { titulo, fecha, lugar, descripcion } = req.body;
 
@@ -265,12 +325,12 @@ app.put('/api/eventos/:id', requireAdminKey, async (req, res) => {
       data: { id: Number(req.params.id), titulo, fecha, lugar, descripcion }
     });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    return handleError(res, error, req);
   }
 });
 
 // DELETE /api/eventos/:id - Eliminar un evento (solo para admin)
-app.delete('/api/eventos/:id', requireAdminKey, async (req, res) => {
+app.delete('/api/eventos/:id', requireAdminKey, validarId, async (req, res) => {
   try {
     const existente = await db.get('SELECT * FROM eventos WHERE id = ?', [req.params.id]);
     if (!existente) {
@@ -280,7 +340,7 @@ app.delete('/api/eventos/:id', requireAdminKey, async (req, res) => {
     await db.run('DELETE FROM eventos WHERE id = ?', [req.params.id]);
     res.json({ success: true, data: { id: Number(req.params.id) } });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    return handleError(res, error, req);
   }
 });
 
@@ -301,7 +361,7 @@ app.get('/api/cursos', requireAdminKey, async (req, res) => {
     const cursos = await db.all('SELECT * FROM cursos ORDER BY nombre ASC');
     res.json({ success: true, data: cursos });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    return handleError(res, error, req);
   }
 });
 
@@ -324,12 +384,12 @@ app.post('/api/cursos', requireAdminKey, async (req, res) => {
       data: { id: result.lastID, nombre, descripcion, drive_url }
     });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    return handleError(res, error, req);
   }
 });
 
 // PUT /api/cursos/:id - Editar un curso (solo admin)
-app.put('/api/cursos/:id', requireAdminKey, async (req, res) => {
+app.put('/api/cursos/:id', requireAdminKey, validarId, async (req, res) => {
   try {
     const { nombre, descripcion, drive_url } = req.body;
 
@@ -349,12 +409,12 @@ app.put('/api/cursos/:id', requireAdminKey, async (req, res) => {
 
     res.json({ success: true, data: { id: Number(req.params.id), nombre, descripcion, drive_url } });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    return handleError(res, error, req);
   }
 });
 
 // DELETE /api/cursos/:id - Eliminar un curso y sus códigos (solo admin)
-app.delete('/api/cursos/:id', requireAdminKey, async (req, res) => {
+app.delete('/api/cursos/:id', requireAdminKey, validarId, async (req, res) => {
   try {
     const existente = await db.get('SELECT * FROM cursos WHERE id = ?', [req.params.id]);
     if (!existente) {
@@ -365,7 +425,7 @@ app.delete('/api/cursos/:id', requireAdminKey, async (req, res) => {
     await db.run('DELETE FROM cursos WHERE id = ?', [req.params.id]);
     res.json({ success: true, data: { id: Number(req.params.id) } });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    return handleError(res, error, req);
   }
 });
 
@@ -382,7 +442,7 @@ app.get('/api/codigos', requireAdminKey, async (req, res) => {
     `);
     res.json({ success: true, data: codigos });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    return handleError(res, error, req);
   }
 });
 
@@ -411,12 +471,12 @@ app.post('/api/codigos', requireAdminKey, async (req, res) => {
       data: { codigo, curso_id: Number(curso_id), nombre_cliente: nombre_cliente || '' }
     });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    return handleError(res, error, req);
   }
 });
 
 // DELETE /api/codigos/:id - Revocar/eliminar un código (solo admin)
-app.delete('/api/codigos/:id', requireAdminKey, async (req, res) => {
+app.delete('/api/codigos/:id', requireAdminKey, validarId, async (req, res) => {
   try {
     const existente = await db.get('SELECT * FROM codigos WHERE id = ?', [req.params.id]);
     if (!existente) {
@@ -426,14 +486,14 @@ app.delete('/api/codigos/:id', requireAdminKey, async (req, res) => {
     await db.run('DELETE FROM codigos WHERE id = ?', [req.params.id]);
     res.json({ success: true, data: { id: Number(req.params.id) } });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    return handleError(res, error, req);
   }
 });
 
 // ===== MIS CURSOS (público: entrega el enlace solo con un código válido) =====
 
 // POST /api/mis-cursos - El visitante ingresa su código y recibe el curso
-app.post('/api/mis-cursos', async (req, res) => {
+app.post('/api/mis-cursos', rateLimit(10, 60000), async (req, res) => {
   try {
     const { codigo } = req.body;
 
@@ -468,7 +528,7 @@ app.post('/api/mis-cursos', async (req, res) => {
       }
     });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    return handleError(res, error, req);
   }
 });
 
@@ -490,7 +550,7 @@ app.get('/api/config', async (req, res) => {
       }
     });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    return handleError(res, error, req);
   }
 });
 
@@ -509,14 +569,15 @@ app.put('/api/config', requireAdminKey, async (req, res) => {
       const valor = typeof req.body[campo] === 'string' ? req.body[campo].trim() : '';
       await db.run(
         'INSERT INTO config (clave, valor) VALUES (?, ?) ON CONFLICT(clave) DO UPDATE SET valor = excluded.valor',
-        [campo, valor]
+        [campo, valor],
+        { returning: false }
       );
     }
 
     const config = await db.get('SELECT valor FROM config WHERE clave = ?', [validos[0]]);
     res.json({ success: true, data: { campo: validos[0], valor: config ? config.valor : '' } });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    return handleError(res, error, req);
   }
 });
 
@@ -542,19 +603,19 @@ app.get('/api/comentarios', async (req, res) => {
       pagination: paginacionRespuesta(total, page, limit)
     });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    return handleError(res, error, req);
   }
 });
 
 // GET /api/comentarios/pendientes - Comentarios esperando moderación (solo admin)
-app.get('/api/comentarios/pendientes', requireAdminKey, async (req, res) => {
+app.get('/api/comentarios/pendientes', requireAdminKey, rateLimit(30, 60000), async (req, res) => {
   try {
     const comentarios = await db.all(
       "SELECT * FROM comentarios WHERE estado = 'pendiente' ORDER BY fecha ASC"
     );
     res.json({ success: true, data: comentarios });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    return handleError(res, error, req);
   }
 });
 
@@ -566,7 +627,7 @@ app.get('/api/comentarios/rechazados', requireAdminKey, async (req, res) => {
     );
     res.json({ success: true, data: comentarios });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    return handleError(res, error, req);
   }
 });
 
@@ -588,12 +649,12 @@ app.get('/api/comentarios/aprobados', requireAdminKey, async (req, res) => {
       pagination: paginacionRespuesta(total, page, limit)
     });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    return handleError(res, error, req);
   }
 });
 
 // PUT /api/comentarios/:id/estado - Aprobar o rechazar un comentario (solo admin)
-app.put('/api/comentarios/:id/estado', requireAdminKey, async (req, res) => {
+app.put('/api/comentarios/:id/estado', requireAdminKey, validarId, async (req, res) => {
   try {
     const { estado } = req.body;
 
@@ -609,12 +670,12 @@ app.put('/api/comentarios/:id/estado', requireAdminKey, async (req, res) => {
     await db.run('UPDATE comentarios SET estado = ? WHERE id = ?', [estado, req.params.id]);
     res.json({ success: true, data: { id: Number(req.params.id), estado } });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    return handleError(res, error, req);
   }
 });
 
 // DELETE /api/comentarios/:id - Eliminar un comentario (solo admin)
-app.delete('/api/comentarios/:id', requireAdminKey, async (req, res) => {
+app.delete('/api/comentarios/:id', requireAdminKey, validarId, async (req, res) => {
   try {
     const existente = await db.get('SELECT * FROM comentarios WHERE id = ?', [req.params.id]);
     if (!existente) {
@@ -624,12 +685,12 @@ app.delete('/api/comentarios/:id', requireAdminKey, async (req, res) => {
     await db.run('DELETE FROM comentarios WHERE id = ?', [req.params.id]);
     res.json({ success: true, data: { id: Number(req.params.id) } });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    return handleError(res, error, req);
   }
 });
 
 // POST /api/comentarios - Crear un nuevo comentario (queda pendiente de moderación)
-app.post('/api/comentarios', async (req, res) => {
+app.post('/api/comentarios', rateLimit(5, 60000), async (req, res) => {
   try {
     const { nombre, mensaje } = req.body;
     
@@ -658,7 +719,7 @@ app.post('/api/comentarios', async (req, res) => {
       data: { id: result.lastID, nombre, mensaje, fecha, estado }
     });
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    return handleError(res, error, req);
   }
 });
 

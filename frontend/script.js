@@ -70,6 +70,27 @@ function urlImagenParaMostrar(url) {
 }
 
 // ============================================
+// UTILIDADES DE SEGURIDAD (previenen XSS)
+// ============================================
+
+// Escapa texto para insertarlo en HTML de forma segura
+function escapeHtml(texto) {
+    return String(texto ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+// Solo permite URLs http/https (bloquea javascript:, data:, etc.)
+function urlSegura(url) {
+    const u = String(url || '').trim();
+    if (/^https?:\/\//i.test(u)) return u;
+    return '';
+}
+
+// ============================================
 // CARÁCTER DE LAS DANZAS
 // ============================================
 
@@ -85,7 +106,7 @@ const CARACTERES = {
 function badgeCaracter(caracter) {
     const info = CARACTERES[caracter] || { label: caracter || 'Festiva', emoji: '🎉' };
     const clave = CARACTERES[caracter] ? caracter : 'festiva';
-    return `<span class="caracter-badge caracter-${clave}">${info.emoji} ${info.label}</span>`;
+    return `<span class="caracter-badge caracter-${clave}">${info.emoji} ${escapeHtml(info.label)}</span>`;
 }
 
 // ============================================
@@ -175,8 +196,14 @@ window.addEventListener('click', (event) => {
     }
 });
 
+// Cache de danzas para abrir el modal por id (evita meter JSON en atributos HTML)
+const danzasCache = new Map();
+
 // Función para abrir modal
-function abrirModalDanza(danza) {
+function abrirModalDanza(id) {
+    const danza = danzasCache.get(Number(id));
+    if (!danza) return;
+
     document.getElementById('modal-titulo').textContent = danza.nombre;
     document.getElementById('modal-region').textContent = danza.region;
     document.getElementById('modal-caracter').innerHTML = badgeCaracter(danza.caracter);
@@ -184,8 +211,9 @@ function abrirModalDanza(danza) {
     document.getElementById('modal-coreografia').textContent = danza.coreografia || 'No hay información disponible.';
 
     const modalImagen = document.getElementById('modal-imagen');
-    if (danza.imagen_url) {
-        modalImagen.innerHTML = `<img src="${urlImagenParaMostrar(danza.imagen_url)}" alt="${danza.nombre}" loading="lazy">`;
+    const imgUrl = urlSegura(urlImagenParaMostrar(danza.imagen_url));
+    if (imgUrl) {
+        modalImagen.innerHTML = `<img src="${imgUrl}" alt="${escapeHtml(danza.nombre)}" loading="lazy">`;
         modalImagen.style.display = 'block';
     } else {
         modalImagen.style.display = 'none';
@@ -194,8 +222,9 @@ function abrirModalDanza(danza) {
     const videoSection = document.getElementById('video-section');
     const videoContainer = document.getElementById('modal-video');
 
-    if (danza.video_url) {
-        videoContainer.innerHTML = `<iframe src="${danza.video_url}" title="Video de ${danza.nombre}" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`;
+    const videoUrl = urlSegura(danza.video_url);
+    if (videoUrl) {
+        videoContainer.innerHTML = `<iframe src="${videoUrl}" title="Video de ${escapeHtml(danza.nombre)}" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`;
         videoSection.style.display = 'block';
     } else {
         videoSection.style.display = 'none';
@@ -212,8 +241,10 @@ function abrirModalDanza(danza) {
 
 const DANZAS_LIMIT = 12;
 let danzaPage = 1;
+let danzasRequestId = 0;
 
 async function cargarDanzas(page = 1) {
+    const requestId = ++danzasRequestId;
     const lista = document.getElementById('danzas-lista');
     lista.innerHTML = '<div class="loading">Cargando danzas...</div>';
 
@@ -227,6 +258,8 @@ async function cargarDanzas(page = 1) {
         const response = await fetch(url);
         const json = await response.json();
 
+        if (requestId !== danzasRequestId) return; // respuesta vieja: ignorar
+
         if (json.success) {
             danzaPage = json.pagination.page;
             mostrarDanzas(json.data);
@@ -235,6 +268,7 @@ async function cargarDanzas(page = 1) {
             mostrarError('danzas-lista', 'Error al cargar las danzas');
         }
     } catch (error) {
+        if (requestId !== danzasRequestId) return;
         console.error('Error al conectar con la API de danzas:', error);
         mostrarError('danzas-lista', 'No se pudo conectar con el servidor');
     }
@@ -261,20 +295,22 @@ function mostrarDanzas(danzas) {
     }
 
     danzas.forEach(danza => {
-        const inicial = danza.nombre.trim().charAt(0).toUpperCase();
-        const imagenHtml = danza.imagen_url
-            ? `<div class="danza-image"><img src="${urlImagenParaMostrar(danza.imagen_url)}" alt="${danza.nombre}" loading="lazy"></div>`
-            : `<div class="danza-image"><span class="danza-inicial">${inicial}</span></div>`;
+        danzasCache.set(danza.id, danza);
+        const inicial = (danza.nombre || '?').trim().charAt(0).toUpperCase();
+        const imgUrl = urlSegura(urlImagenParaMostrar(danza.imagen_url));
+        const imagenHtml = imgUrl
+            ? `<div class="danza-image"><img src="${imgUrl}" alt="${escapeHtml(danza.nombre)}" loading="lazy"></div>`
+            : `<div class="danza-image"><span class="danza-inicial">${escapeHtml(inicial)}</span></div>`;
         const card = document.createElement('div');
         card.className = 'danza-card';
         card.innerHTML = `
             ${imagenHtml}
             <div class="danza-content">
-                <h3>${danza.nombre}</h3>
-                <span class="danza-region">📍 ${danza.region}</span>
+                <h3>${escapeHtml(danza.nombre)}</h3>
+                <span class="danza-region">📍 ${escapeHtml(danza.region)}</span>
                 ${badgeCaracter(danza.caracter)}
-                <p class="danza-description">${(danza.historia || '').substring(0, 100)}...</p>
-                <button class="danza-button" onclick="abrirModalDanza(${JSON.stringify(danza).replace(/"/g, '&quot;')})">
+                <p class="danza-description">${escapeHtml((danza.historia || '').substring(0, 100))}...</p>
+                <button class="danza-button" onclick="abrirModalDanza(${danza.id})">
                     Ver Detalles
                 </button>
             </div>
@@ -332,9 +368,9 @@ function mostrarEventos(eventos) {
         card.className = 'evento-card';
         card.innerHTML = `
             <div class="evento-fecha">📅 ${fechaFormato}</div>
-            <h3>${evento.titulo}</h3>
-            <div class="evento-lugar">📍 ${evento.lugar || ''}</div>
-            <div class="evento-descripcion">${evento.descripcion || ''}</div>
+            <h3>${escapeHtml(evento.titulo)}</h3>
+            <div class="evento-lugar">📍 ${escapeHtml(evento.lugar || '')}</div>
+            <div class="evento-descripcion">${escapeHtml(evento.descripcion || '')}</div>
         `;
         lista.appendChild(card);
     });
@@ -385,8 +421,8 @@ function mostrarComentarios(comentarios) {
         const card = document.createElement('div');
         card.className = 'comentario-card';
         card.innerHTML = `
-            <div class="comentario-nombre">✍️ ${comentario.nombre}</div>
-            <p class="comentario-mensaje">"${comentario.mensaje}"</p>
+            <div class="comentario-nombre">✍️ ${escapeHtml(comentario.nombre)}</div>
+            <p class="comentario-mensaje">"${escapeHtml(comentario.mensaje)}"</p>
             <div class="comentario-fecha">${fechaFormato}</div>
         `;
         grid.appendChild(card);
@@ -482,9 +518,9 @@ function renderRecursos() {
 
         const cards = items.map(item => `
             <div class="recurso-card">
-                <h4>${item.titulo}</h4>
-                ${item.descripcion ? `<p>${item.descripcion}</p>` : ''}
-                <a href="${item.url}" target="_blank" rel="noopener noreferrer" class="recurso-button">Abrir en Google Drive</a>
+                <h4>${escapeHtml(item.titulo)}</h4>
+                ${item.descripcion ? `<p>${escapeHtml(item.descripcion)}</p>` : ''}
+                <a href="${urlSegura(item.url)}" target="_blank" rel="noopener noreferrer" class="recurso-button">Abrir en Google Drive</a>
             </div>
         `).join('');
 
@@ -542,21 +578,28 @@ const formStatus = document.getElementById('form-status');
 formComentario.addEventListener('submit', async (e) => {
     e.preventDefault();
 
+    const btnComentario = formComentario.querySelector('button[type="submit"]');
+    if (btnComentario && btnComentario.disabled) return;
+    if (btnComentario) btnComentario.disabled = true;
+
     const nombre = document.getElementById('nombre').value.trim();
     const mensaje = document.getElementById('mensaje').value.trim();
 
     // Validaciones
     if (!nombre || !mensaje) {
+        if (btnComentario) btnComentario.disabled = false;
         mostrarEstado('Por favor completa todos los campos', 'error');
         return;
     }
 
     if (nombre.length < 2 || nombre.length > 100) {
+        if (btnComentario) btnComentario.disabled = false;
         mostrarEstado('El nombre debe tener entre 2 y 100 caracteres', 'error');
         return;
     }
 
     if (mensaje.length < 5 || mensaje.length > 1000) {
+        if (btnComentario) btnComentario.disabled = false;
         mostrarEstado('El mensaje debe tener entre 5 y 1000 caracteres', 'error');
         return;
     }
@@ -583,6 +626,8 @@ formComentario.addEventListener('submit', async (e) => {
     } catch (error) {
         console.error('Error al enviar comentario:', error);
         mostrarEstado('Error al conectar con el servidor. Intenta más tarde.', 'error');
+    } finally {
+        if (btnComentario) btnComentario.disabled = false;
     }
 });
 
@@ -610,12 +655,17 @@ if (formCodigo) {
     formCodigo.addEventListener('submit', async (e) => {
         e.preventDefault();
 
+        const btnCodigo = formCodigo.querySelector('button[type="submit"]');
+        if (btnCodigo && btnCodigo.disabled) return;
+        if (btnCodigo) btnCodigo.disabled = true;
+
         const codigoInput = document.getElementById('codigo-input');
         const codigo = codigoInput.value.trim();
 
         cursoDesbloqueado.style.display = 'none';
 
         if (!codigo) {
+            if (btnCodigo) btnCodigo.disabled = false;
             codigoStatus.className = 'form-status error';
             codigoStatus.textContent = 'Ingresá tu código de acceso';
             codigoStatus.style.display = 'block';
@@ -638,12 +688,19 @@ if (formCodigo) {
             if (json.success) {
                 const curso = json.data.curso;
                 codigoStatus.style.display = 'none';
-                cursoDesbloqueado.innerHTML = `
-                    <h3>${curso.nombre}</h3>
-                    ${curso.descripcion ? `<p>${curso.descripcion}</p>` : ''}
-                    <a href="${curso.drive_url}" target="_blank" rel="noopener noreferrer" class="recurso-button">Abrir curso</a>
-                `;
-                cursoDesbloqueado.style.display = 'block';
+                const cursoUrl = urlSegura(curso.drive_url);
+                if (!cursoUrl) {
+                    codigoStatus.className = 'form-status error';
+                    codigoStatus.textContent = 'El enlace del curso no está disponible en este momento.';
+                    codigoStatus.style.display = 'block';
+                } else {
+                    cursoDesbloqueado.innerHTML = `
+                        <h3>${escapeHtml(curso.nombre)}</h3>
+                        ${curso.descripcion ? `<p>${escapeHtml(curso.descripcion)}</p>` : ''}
+                        <a href="${cursoUrl}" target="_blank" rel="noopener noreferrer" class="recurso-button">Abrir curso</a>
+                    `;
+                    cursoDesbloqueado.style.display = 'block';
+                }
             } else {
                 codigoStatus.className = 'form-status error';
                 codigoStatus.textContent = json.error || 'Código inválido';
@@ -654,6 +711,8 @@ if (formCodigo) {
             codigoStatus.className = 'form-status error';
             codigoStatus.textContent = 'No se pudo conectar con el servidor. Intenta más tarde.';
             codigoStatus.style.display = 'block';
+        } finally {
+            if (btnCodigo) btnCodigo.disabled = false;
         }
     });
 }
@@ -665,7 +724,7 @@ if (formCodigo) {
 async function verificarAPI() {
     try {
         const response = await fetch(`${API_URL}/api/health`, {
-            timeout: 5000
+            signal: AbortSignal.timeout(8000)
         });
 
         return response.ok;

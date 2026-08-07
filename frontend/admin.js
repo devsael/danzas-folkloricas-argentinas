@@ -128,7 +128,7 @@ const CARACTERES_ADMIN = {
 function badgeCaracterAdmin(caracter) {
     const info = CARACTERES_ADMIN[caracter] || { label: caracter || 'Festiva', emoji: '🎉' };
     const clave = CARACTERES_ADMIN[caracter] ? caracter : 'festiva';
-    return `<span class="caracter-badge caracter-${clave}">${info.emoji} ${info.label}</span>`;
+    return `<span class="caracter-badge caracter-${clave}">${info.emoji} ${escapeHtml(info.label)}</span>`;
 }
 
 // Convierte cualquier enlace de Google Drive en una URL de imagen para <img>
@@ -139,6 +139,13 @@ function urlImagenParaMostrar(url) {
     const id = m1 ? m1[1] : (m2 ? m2[1] : null);
     if (id) return `https://drive.google.com/thumbnail?id=${id}&sz=w800`;
     return url;
+}
+
+// Solo permite URLs http/https (bloquea javascript:, data:, etc.)
+function urlSeguraAdmin(url) {
+    const u = String(url || '').trim();
+    if (/^https?:\/\//i.test(u)) return u;
+    return '';
 }
 
 // ============================================
@@ -232,7 +239,10 @@ function editarDanza(id) {
     document.querySelector('.admin-form-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-async function eliminarDanza(id, nombre) {
+async function eliminarDanza(id) {
+    const danza = danzasCache.find(d => d.id === id);
+    const nombre = danza ? danza.nombre : 'esta danza';
+
     if (!confirm(`¿Seguro que querés eliminar "${nombre}"? Esta acción no se puede deshacer.`)) {
         return;
     }
@@ -270,19 +280,20 @@ async function cargarDanzasAdmin() {
         if (json.success && json.data.length > 0) {
             danzasCache = json.data;
             lista.innerHTML = json.data.map(d => {
-                const mini = d.imagen_url ? `<img class="admin-thumb" src="${urlImagenParaMostrar(d.imagen_url)}" alt="${d.nombre}" loading="lazy">` : '';
+                const imgUrl = urlSeguraAdmin(urlImagenParaMostrar(d.imagen_url));
+                const mini = imgUrl ? `<img class="admin-thumb" src="${imgUrl}" alt="${escapeHtml(d.nombre)}" loading="lazy">` : '';
                 return `
                 <div class="admin-list-item">
                     ${mini}
                     <div class="admin-list-content">
-                        <h4>💃 ${d.nombre}</h4>
-                        <p><strong>Región:</strong> ${d.region}</p>
+                        <h4>💃 ${escapeHtml(d.nombre)}</h4>
+                        <p><strong>Región:</strong> ${escapeHtml(d.region)}</p>
                         <p>${badgeCaracterAdmin(d.caracter)}</p>
-                        <p>${(d.historia || '').substring(0, 120)}${d.historia && d.historia.length > 120 ? '...' : ''}</p>
+                        <p>${escapeHtml((d.historia || '').substring(0, 120))}${d.historia && d.historia.length > 120 ? '...' : ''}</p>
                     </div>
                     <div class="admin-list-actions">
                         <button class="admin-action-btn btn-editar" onclick="editarDanza(${d.id})">Editar</button>
-                        <button class="admin-action-btn btn-eliminar" onclick="eliminarDanza(${d.id}, '${d.nombre.replace(/'/g, "\\'")}')">Eliminar</button>
+                        <button class="admin-action-btn btn-eliminar" onclick="eliminarDanza(${d.id})">Eliminar</button>
                     </div>
                 </div>
             `;
@@ -381,7 +392,10 @@ function editarEvento(id) {
     document.querySelectorAll('.admin-form-card')[1].scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-async function eliminarEvento(id, titulo) {
+async function eliminarEvento(id) {
+    const evento = eventosCache.find(ev => ev.id === id);
+    const titulo = evento ? evento.titulo : 'este evento';
+
     if (!confirm(`¿Seguro que querés eliminar "${titulo}"? Esta acción no se puede deshacer.`)) {
         return;
     }
@@ -425,13 +439,13 @@ async function cargarEventosAdmin() {
                 return `
                     <div class="admin-list-item">
                         <div class="admin-list-content">
-                            <h4>📅 ${ev.titulo}</h4>
-                            <p><strong>${fecha}</strong>${ev.lugar ? ' — ' + ev.lugar : ''}</p>
-                            <p>${(ev.descripcion || '').substring(0, 120)}${ev.descripcion && ev.descripcion.length > 120 ? '...' : ''}</p>
+                            <h4>📅 ${escapeHtml(ev.titulo)}</h4>
+                            <p><strong>${fecha}</strong>${ev.lugar ? ' — ' + escapeHtml(ev.lugar) : ''}</p>
+                            <p>${escapeHtml((ev.descripcion || '').substring(0, 120))}${ev.descripcion && ev.descripcion.length > 120 ? '...' : ''}</p>
                         </div>
                         <div class="admin-list-actions">
                             <button class="admin-action-btn btn-editar" onclick="editarEvento(${ev.id})">Editar</button>
-                            <button class="admin-action-btn btn-eliminar" onclick="eliminarEvento(${ev.id}, '${ev.titulo.replace(/'/g, "\\'")}')">Eliminar</button>
+                            <button class="admin-action-btn btn-eliminar" onclick="eliminarEvento(${ev.id})">Eliminar</button>
                         </div>
                     </div>
                 `;
@@ -529,7 +543,10 @@ function editarCurso(id) {
     document.querySelectorAll('.admin-form-card')[3].scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-async function eliminarCurso(id, nombre) {
+async function eliminarCurso(id) {
+    const curso = cursosCache.find(c => c.id === id);
+    const nombre = curso ? curso.nombre : 'este curso';
+
     if (!confirm(`¿Seguro que querés eliminar "${nombre}"? Se borrarán también sus códigos de acceso.`)) {
         return;
     }
@@ -582,7 +599,7 @@ async function cargarCursosAdmin() {
                     </div>
                     <div class="admin-list-actions">
                         <button class="admin-action-btn btn-editar" onclick="editarCurso(${c.id})">Editar</button>
-                        <button class="admin-action-btn btn-eliminar" onclick="eliminarCurso(${c.id}, '${c.nombre.replace(/'/g, "\\'")}')">Eliminar</button>
+                        <button class="admin-action-btn btn-eliminar" onclick="eliminarCurso(${c.id})">Eliminar</button>
                     </div>
                 </div>
             `).join('');
@@ -672,6 +689,8 @@ function formatFecha(fecha) {
     return d.toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' });
 }
 
+let codigosCache = [];
+
 async function cargarCodigosAdmin() {
     const lista = document.getElementById('codigos-admin-lista');
     try {
@@ -685,6 +704,7 @@ async function cargarCodigosAdmin() {
         const json = await response.json();
 
         if (json.success && json.data.length > 0) {
+            codigosCache = json.data;
             lista.innerHTML = json.data.map(c => {
                 const estadoBadge = c.estado === 'activo'
                     ? '<span class="codigo-estado activo">activo</span>'
@@ -692,19 +712,20 @@ async function cargarCodigosAdmin() {
                 return `
                     <div class="admin-list-item">
                         <div class="admin-list-content">
-                            <h4><span class="codigo-chip-small">${c.codigo}</span></h4>
+                            <h4><span class="codigo-chip-small">${escapeHtml(c.codigo)}</span></h4>
                             <p><strong>${escapeHtml(c.curso_nombre || '—')}</strong></p>
                             <p>${c.nombre_cliente ? 'Cliente: ' + escapeHtml(c.nombre_cliente) : 'Sin nombre de cliente'}</p>
                             <p style="font-size:0.8rem; color:#999;">Creado: ${formatFecha(c.creado)}${c.usado ? ' · Usado: ' + formatFecha(c.usado) : ''}</p>
                         </div>
                         <div class="admin-list-actions">
                             ${estadoBadge}
-                            <button class="admin-action-btn btn-eliminar" onclick="eliminarCodigo(${c.id}, '${c.codigo}')">Eliminar</button>
+                            <button class="admin-action-btn btn-eliminar" onclick="eliminarCodigo(${c.id})">Eliminar</button>
                         </div>
                     </div>
                 `;
             }).join('');
         } else {
+            codigosCache = [];
             lista.innerHTML = '<p class="loading">Todavía no hay códigos generados</p>';
         }
     } catch (error) {
@@ -713,7 +734,10 @@ async function cargarCodigosAdmin() {
     }
 }
 
-async function eliminarCodigo(id, codigo) {
+async function eliminarCodigo(id) {
+    const codigoReg = codigosCache.find(c => c.id === id);
+    const codigo = codigoReg ? codigoReg.codigo : '';
+
     if (!confirm(`¿Revocar y eliminar el código ${codigo}?`)) {
         return;
     }
@@ -754,7 +778,7 @@ function urlImagenPreview(url) {
     const m2 = url.match(/\/d\/([^/]+)/);
     const id = m1 ? m1[1] : (m2 ? m2[1] : null);
     if (id) return `https://drive.google.com/thumbnail?id=${id}&sz=w800`;
-    return url;
+    return urlSeguraAdmin(url);
 }
 
 function actualizarPreviewPortada() {
@@ -763,7 +787,7 @@ function actualizarPreviewPortada() {
     const img = urlImagenPreview(url);
 
     if (img) {
-        preview.style.backgroundImage = `linear-gradient(135deg, rgba(139, 111, 71, 0.35) 0%, rgba(193, 65, 12, 0.25) 100%), url('${img}')`;
+        preview.style.backgroundImage = `linear-gradient(135deg, rgba(139, 111, 71, 0.35) 0%, rgba(193, 65, 12, 0.25) 100%), url('${img.replace(/'/g, '%27')}')`;
         preview.textContent = '';
     } else {
         preview.style.backgroundImage = '';
