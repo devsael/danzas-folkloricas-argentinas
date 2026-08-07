@@ -21,6 +21,35 @@ if (heroPortada && HERO_BACKGROUND_URL) {
 }
 
 // ============================================
+// BOTÓN DE LA PORTADA (Google Drive)
+// ============================================
+// El botón de la portada solo aparece cuando ponés una url.
+// Usá el formato directo de descarga de Drive:
+//   https://drive.google.com/uc?export=download&id=TU_ID_DEL_ARCHIVO
+const HERO_BOTON_DRIVE = {
+    texto: '📘 Descargar Curso',
+    url: '' // 'https://drive.google.com/uc?export=download&id=TU_ID_DEL_ARCHIVO'
+};
+
+function renderBotonDrive() {
+    const link = document.getElementById('hero-drive-link');
+    if (!link || !HERO_BOTON_DRIVE.url) return;
+    link.href = HERO_BOTON_DRIVE.url;
+    link.textContent = HERO_BOTON_DRIVE.texto;
+    link.style.display = 'inline-block';
+}
+
+// Convierte cualquier enlace de Google Drive en una URL de imagen para <img>
+function urlImagenParaMostrar(url) {
+    if (!url) return '';
+    const m1 = url.match(/[?&]id=([^&]+)/);
+    const m2 = url.match(/\/d\/([^/]+)/);
+    const id = m1 ? m1[1] : (m2 ? m2[1] : null);
+    if (id) return `https://drive.google.com/thumbnail?id=${id}&sz=w800`;
+    return url;
+}
+
+// ============================================
 // CARÁCTER DE LAS DANZAS
 // ============================================
 
@@ -134,6 +163,14 @@ function abrirModalDanza(danza) {
     document.getElementById('modal-historia').textContent = danza.historia || 'No hay información disponible.';
     document.getElementById('modal-coreografia').textContent = danza.coreografia || 'No hay información disponible.';
 
+    const modalImagen = document.getElementById('modal-imagen');
+    if (danza.imagen_url) {
+        modalImagen.innerHTML = `<img src="${urlImagenParaMostrar(danza.imagen_url)}" alt="${danza.nombre}" loading="lazy">`;
+        modalImagen.style.display = 'block';
+    } else {
+        modalImagen.style.display = 'none';
+    }
+
     const videoSection = document.getElementById('video-section');
     const videoContainer = document.getElementById('modal-video');
 
@@ -205,10 +242,13 @@ function mostrarDanzas(danzas) {
 
     danzas.forEach(danza => {
         const inicial = danza.nombre.trim().charAt(0).toUpperCase();
+        const imagenHtml = danza.imagen_url
+            ? `<div class="danza-image"><img src="${urlImagenParaMostrar(danza.imagen_url)}" alt="${danza.nombre}" loading="lazy"></div>`
+            : `<div class="danza-image"><span class="danza-inicial">${inicial}</span></div>`;
         const card = document.createElement('div');
         card.className = 'danza-card';
         card.innerHTML = `
-            <div class="danza-image"><span class="danza-inicial">${inicial}</span></div>
+            ${imagenHtml}
             <div class="danza-content">
                 <h3>${danza.nombre}</h3>
                 <span class="danza-region">📍 ${danza.region}</span>
@@ -599,6 +639,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Mostrar banner mientras Render despierta en la primera carga
     mostrarDespertando();
+
+    // Botón de descarga de la portada (solo si HERO_BOTON_DRIVE.url está configurada)
+    renderBotonDrive();
 
     // Recursos (solo se muestra si hay ítems configurados)
     renderRecursos();

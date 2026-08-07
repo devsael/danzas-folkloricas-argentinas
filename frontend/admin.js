@@ -128,6 +128,16 @@ function badgeCaracterAdmin(caracter) {
     return `<span class="caracter-badge caracter-${clave}">${info.emoji} ${info.label}</span>`;
 }
 
+// Convierte cualquier enlace de Google Drive en una URL de imagen para <img>
+function urlImagenParaMostrar(url) {
+    if (!url) return '';
+    const m1 = url.match(/[?&]id=([^&]+)/);
+    const m2 = url.match(/\/d\/([^/]+)/);
+    const id = m1 ? m1[1] : (m2 ? m2[1] : null);
+    if (id) return `https://drive.google.com/thumbnail?id=${id}&sz=w800`;
+    return url;
+}
+
 // ============================================
 // DANZAS
 // ============================================
@@ -149,6 +159,7 @@ formDanza.addEventListener('submit', async (e) => {
     const historia = document.getElementById('d-historia').value.trim();
     const coreografia = document.getElementById('d-coreografia').value.trim();
     const video_url = document.getElementById('d-video').value.trim();
+    const imagen_url = document.getElementById('d-imagen').value.trim();
 
     if (!nombre || !region || !caracter) {
         mostrarEstado('danza-status', 'Nombre, región y carácter son obligatorios', 'error');
@@ -163,7 +174,7 @@ formDanza.addEventListener('submit', async (e) => {
         const response = await fetch(url, {
             method,
             headers: adminHeaders(),
-            body: JSON.stringify({ nombre, region, caracter, historia, coreografia, video_url })
+            body: JSON.stringify({ nombre, region, caracter, historia, coreografia, video_url, imagen_url })
         });
 
         const json = await response.json();
@@ -209,6 +220,7 @@ function editarDanza(id) {
     document.getElementById('d-historia').value = danza.historia || '';
     document.getElementById('d-coreografia').value = danza.coreografia || '';
     document.getElementById('d-video').value = danza.video_url || '';
+    document.getElementById('d-imagen').value = danza.imagen_url || '';
 
     danzaFormTitle.textContent = `Editando: ${danza.nombre}`;
     danzaSubmitBtn.textContent = 'Actualizar Danza';
@@ -254,8 +266,11 @@ async function cargarDanzasAdmin() {
 
         if (json.success && json.data.length > 0) {
             danzasCache = json.data;
-            lista.innerHTML = json.data.map(d => `
+            lista.innerHTML = json.data.map(d => {
+                const mini = d.imagen_url ? `<img class="admin-thumb" src="${urlImagenParaMostrar(d.imagen_url)}" alt="${d.nombre}" loading="lazy">` : '';
+                return `
                 <div class="admin-list-item">
+                    ${mini}
                     <div class="admin-list-content">
                         <h4>💃 ${d.nombre}</h4>
                         <p><strong>Región:</strong> ${d.region}</p>
@@ -267,7 +282,8 @@ async function cargarDanzasAdmin() {
                         <button class="admin-action-btn btn-eliminar" onclick="eliminarDanza(${d.id}, '${d.nombre.replace(/'/g, "\\'")}')">Eliminar</button>
                     </div>
                 </div>
-            `).join('');
+            `;
+            }).join('');
         } else {
             danzasCache = [];
             lista.innerHTML = '<p class="loading">Todavía no hay danzas cargadas</p>';

@@ -144,8 +144,8 @@ async function main() {
   // Insertar danzas
   for (const d of danzas) {
     await db.run(
-      'INSERT INTO danzas (nombre, region, caracter, historia, coreografia, video_url) VALUES (?, ?, ?, ?, ?, ?)',
-      [d.nombre, d.region, d.caracter, d.historia, d.coreografia, d.video_url]
+      'INSERT INTO danzas (nombre, region, caracter, historia, coreografia, video_url, imagen_url) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [d.nombre, d.region, d.caracter, d.historia, d.coreografia, d.video_url, d.imagen_url || '']
     );
     console.log(`✓ Insertado: ${d.nombre} (${d.caracter})`);
   }

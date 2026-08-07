@@ -15,7 +15,8 @@ const danzas = db.isPostgres
       caracter TEXT DEFAULT 'festiva',
       historia TEXT,
       coreografia TEXT,
-      video_url TEXT
+      video_url TEXT,
+      imagen_url TEXT
     )`
   : `CREATE TABLE IF NOT EXISTS danzas (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -24,7 +25,8 @@ const danzas = db.isPostgres
       caracter TEXT DEFAULT 'festiva',
       historia TEXT,
       coreografia TEXT,
-      video_url TEXT
+      video_url TEXT,
+      imagen_url TEXT
     )`;
 
 const eventos = db.isPostgres
