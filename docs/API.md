@@ -5,7 +5,7 @@ Referencia completa de todos los endpoints disponibles en la API REST.
 ## 🔗 Base URL
 
 **Desarrollo**: `http://localhost:3000`  
-**Producción**: `https://tu-backend.onrender.com`
+**Producción**: `https://danzas-folkloricas-api.onrender.com`
 
 ## 📋 Tabla de Contenidos
 
@@ -14,6 +14,9 @@ Referencia completa de todos los endpoints disponibles en la API REST.
 - [Danzas](#danzas)
 - [Eventos](#eventos)
 - [Comentarios](#comentarios)
+- [Cursos Premium](#cursos-premium)
+- [Códigos de Acceso](#códigos-de-acceso)
+- [Mis Cursos](#mis-cursos)
 - [Códigos de Estado](#códigos-de-estado)
 - [Ejemplos cURL](#ejemplos-curl)
 - [Manejo de Errores](#manejo-de-errores)
@@ -92,6 +95,13 @@ ADMIN_KEY=poné-acá-una-clave-secreta-larga-y-única
 | GET | `/api/comentarios/rechazados` | Comentarios rechazados |
 | PUT | `/api/comentarios/:id/estado` | Aprobar/rechazar comentario |
 | DELETE | `/api/comentarios/:id` | Borrar comentario |
+| GET | `/api/cursos` | Listar cursos (admin) |
+| POST | `/api/cursos` | Crear curso |
+| PUT | `/api/cursos/:id` | Editar curso |
+| DELETE | `/api/cursos/:id` | Borrar curso (y sus códigos) |
+| GET | `/api/codigos` | Listar códigos de acceso |
+| POST | `/api/codigos` | Generar código de acceso |
+| DELETE | `/api/codigos/:id` | Eliminar/revocar código |
 
 ---
 
@@ -120,7 +130,8 @@ Accept: application/json
       "caracter": "festiva",
       "historia": "Danza festiva de origen andino que representa la cosecha y la alegría...",
       "coreografia": "Movimientos circulares, giros de parejas, palmoteos rítmicos...",
-      "video_url": "https://www.youtube.com/embed/CKG_5PFQIA4"
+      "video_url": "https://www.youtube.com/embed/CKG_5PFQIA4",
+      "imagen_url": "https://drive.google.com/thumbnail?id=1AbC123xyz&sz=w800"
     }
   ],
   "pagination": {
@@ -241,6 +252,7 @@ X-API-Key: mi-clave-secreta
 - `historia` (string, 0-2000) - Historia y contexto [opcional]
 - `coreografia` (string, 0-2000) - Descripción de coreografía [opcional]
 - `video_url` (string, 0-500) - URL de video (YouTube embed) [opcional]
+- `imagen_url` (string, 0-500) - URL de imagen pública (por ej. Google Drive thumbnail) [opcional]
 
 **Validaciones:**
 - Nombre debe ser único
@@ -546,6 +558,165 @@ Content-Type: application/json
 
 ---
 
+## 🎓 Cursos Premium
+
+Los cursos son contenido **pago** (material, guías, videos de Drive) que se vende fuera de la página. El enlace real de Drive se guarda **solo en el servidor**: nunca aparece en el HTML público, ni en el listado de cursos ni en el panel. Se entrega únicamente a través del endpoint [Mis Cursos](#mis-cursos) a quien presente un código de acceso válido.
+
+Todos los endpoints de esta sección 🔒 **requieren clave de administrador**.
+
+### GET /api/cursos
+
+Lista todos los cursos. **Respuesta:** los cursos **no** incluyen `drive_url` por seguridad.
+
+**Request:**
+```http
+GET /api/cursos HTTP/1.1
+Host: localhost:3000
+X-API-Key: mi-clave-secreta
+```
+
+**Response (200 OK):**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 1,
+      "nombre": "Curso Completo de Chacarera",
+      "descripcion": "Del nivel inicial al avanzado, con videos y guías.",
+      "creado": "2026-08-06T21:00:00.000Z"
+    }
+  ]
+}
+```
+
+### POST /api/cursos
+
+Crea un curso. El `drive_url` es obligatorio pero queda guardado en el servidor.
+
+**Request:**
+```http
+POST /api/cursos HTTP/1.1
+Host: localhost:3000
+Content-Type: application/json
+X-API-Key: mi-clave-secreta
+
+{
+  "nombre": "Curso Completo de Chacarera",
+  "descripcion": "Del nivel inicial al avanzado, con videos y guías.",
+  "drive_url": "https://drive.google.com/uc?export=download&id=ABc123..."
+}
+```
+
+**Response (201 Created):** `{ "success": true, "data": { "id": 1, "nombre": "...", "descripcion": "..." } }`
+
+**Parámetros del Body:**
+- `nombre` (string) - Nombre del curso [requerido]
+- `descripcion` (string) - Descripción [opcional]
+- `drive_url` (string) - Enlace privado del contenido [requerido]
+
+### PUT /api/cursos/:id
+
+Edita nombre, descripción y/o enlace de un curso.
+
+### DELETE /api/cursos/:id
+
+Elimina un curso y **todos sus códigos asociados**.
+
+---
+
+## 🔑 Códigos de Acceso
+
+Cada venta se convierte en un código único (formato `DFA-XXXX-XXXX`) que el admin le pasa al alumno. Un código activo se puede usar más de una vez (el alumno conserva el acceso); al eliminarlo, queda revocado.
+
+### GET /api/codigos
+
+Lista todos los códigos con su curso, cliente, estado y fechas. 🔒 **Admin**
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 3,
+      "codigo": "DFA-DBTY-CN2V",
+      "curso_id": 1,
+      "curso_nombre": "Curso Completo de Chacarera",
+      "nombre_cliente": "María González",
+      "estado": "activo",
+      "creado": "2026-08-06T21:05:00.000Z",
+      "usado": null
+    }
+  ]
+}
+```
+
+### POST /api/codigos
+
+Genera un nuevo código. 🔒 **Admin**
+
+**Request:**
+```http
+POST /api/codigos HTTP/1.1
+Host: localhost:3000
+Content-Type: application/json
+X-API-Key: mi-clave-secreta
+
+{ "curso_id": 1, "nombre_cliente": "María González" }
+```
+
+**Response (201 Created):**
+```json
+{
+  "success": true,
+  "data": { "id": 3, "codigo": "DFA-DBTY-CN2V", "curso_id": 1, "nombre_cliente": "María González", "estado": "activo" }
+}
+```
+
+**Errores:** 400 si el curso no existe o no se envía `curso_id`.
+
+### DELETE /api/codigos/:id
+
+Elimina (revoca) un código. 🔒 **Admin** — el alumno pierde el acceso.
+
+---
+
+## 🎫 Mis Cursos
+
+Endpoint **público** por el que un alumno entrega su código y, si es válido, recibe el enlace del curso.
+
+### POST /api/mis-cursos
+
+**Request:**
+```http
+POST /api/mis-cursos HTTP/1.1
+Host: localhost:3000
+Content-Type: application/json
+
+{ "codigo": "DFA-DBTY-CN2V" }
+```
+
+**Response (200 OK)** — aquí sí se devuelve el enlace:
+```json
+{
+  "success": true,
+  "data": {
+    "curso": {
+      "id": 1,
+      "nombre": "Curso Completo de Chacarera",
+      "descripcion": "Del nivel inicial al avanzado.",
+      "drive_url": "https://drive.google.com/uc?export=download&id=ABc123..."
+    }
+  }
+}
+```
+
+**Errores:**
+- `400 Bad Request` → falta el campo `codigo`
+- `404 Not Found` → el código no existe o fue revocado
+
+---
+
 ## 📊 Códigos de Estado HTTP
 
 | Código | Significado | Cuándo Ocurre |
@@ -636,6 +807,33 @@ curl -X POST http://localhost:3000/api/comentarios \
   }'
 ```
 
+### Crear un curso (admin)
+```bash
+curl -X POST http://localhost:3000/api/cursos \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: mi-clave-secreta" \
+  -d '{
+    "nombre": "Curso Completo de Chacarera",
+    "descripcion": "Del nivel inicial al avanzado.",
+    "drive_url": "https://drive.google.com/uc?export=download&id=ABc123..."
+  }'
+```
+
+### Generar un código de acceso (admin)
+```bash
+curl -X POST http://localhost:3000/api/codigos \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: mi-clave-secreta" \
+  -d '{"curso_id": 1, "nombre_cliente": "María González"}'
+```
+
+### Usar el código desde la web (público)
+```bash
+curl -X POST http://localhost:3000/api/mis-cursos \
+  -H "Content-Type: application/json" \
+  -d '{"codigo": "DFA-DBTY-CN2V"}'
+```
+
 ### Usar jq para formatear respuestas
 ```bash
 curl http://localhost:3000/api/danzas | jq '.'
@@ -709,4 +907,4 @@ Todos los errores siguen este formato:
 
 ---
 
-Última actualización: Septiembre 2025
+Última actualización: Agosto 2026
