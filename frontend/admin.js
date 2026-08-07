@@ -849,6 +849,129 @@ formConfig.addEventListener('submit', async (e) => {
 });
 
 // ============================================
+// RESPALDO DE DATOS
+// ============================================
+
+async function descargarRespaldo() {
+    const status = document.getElementById('respaldo-status');
+    status.className = 'form-status';
+    status.textContent = 'Generando respaldo...';
+    status.style.display = 'block';
+
+    try {
+        const response = await fetch(`${API_URL}/api/backup`, { headers: { 'X-API-Key': getAdminKey() } });
+
+        if (response.status === 401) {
+            manejarNoAutorizado();
+            return;
+        }
+
+        const json = await response.json();
+
+        if (!json.success) {
+            status.className = 'form-status error';
+            status.textContent = `Error: ${json.error}`;
+            return;
+        }
+
+        const contenido = JSON.stringify(json.data, null, 2);
+        const blob = new Blob([contenido], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        const fecha = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+        a.href = url;
+        a.download = `respaldo-danzas-${fecha}.json`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+
+        status.className = 'form-status success';
+        status.textContent = `✓ Respaldo descargado con ${json.data.danzas.length} danzas, ${json.data.eventos.length} eventos, ${json.data.cursos.length} cursos.`;
+        setTimeout(() => { status.style.display = 'none'; }, 6000);
+    } catch (error) {
+        console.error(error);
+        status.className = 'form-status error';
+        status.textContent = 'No se pudo conectar con el servidor';
+    }
+}
+
+async function restaurarRespaldo(file) {
+    const status = document.getElementById('respaldo-status');
+
+    try {
+        const texto = await file.text();
+        const datos = JSON.parse(texto);
+
+        if (!datos.danzas && !datos.data) {
+            status.className = 'form-status error';
+            status.textContent = 'Ese archivo no parece un respaldo válido';
+            status.style.display = 'block';
+            return;
+        }
+
+        if (!confirm('⚠️ Esto REEMPLAZARÁ todos los datos actuales (danzas, eventos, comentarios, cursos, códigos y configuración) por el contenido del respaldo. ¿Continuar?')) {
+            return;
+        }
+
+        status.className = 'form-status';
+        status.textContent = 'Restaurando...';
+        status.style.display = 'block';
+
+        const response = await fetch(`${API_URL}/api/restore`, {
+            method: 'POST',
+            headers: adminHeaders(),
+            body: JSON.stringify(datos)
+        });
+
+        if (response.status === 401) {
+            manejarNoAutorizado();
+            return;
+        }
+
+        const json = await response.json();
+
+        if (json.success) {
+            status.className = 'form-status success';
+            const r = json.data.restaurados;
+            status.textContent = `✓ Respaldo restaurado: ${r.danzas} danzas, ${r.eventos} eventos, ${r.comentarios} comentarios, ${r.cursos} cursos, ${r.codigos} códigos.`;
+            setTimeout(() => { status.style.display = 'none'; }, 8000);
+            cargarDanzasAdmin();
+            cargarEventosAdmin();
+            cargarComentariosAdmin();
+            cargarCursosAdmin();
+            cargarCodigosAdmin();
+            cargarConfigAdmin();
+        } else {
+            status.className = 'form-status error';
+            status.textContent = `Error: ${json.error}`;
+        }
+    } catch (error) {
+        console.error(error);
+        status.className = 'form-status error';
+        status.textContent = 'El archivo no es un JSON válido o no se pudo conectar';
+    }
+}
+
+const btnDescargarRespaldo = document.getElementById('btn-descargar-respaldo');
+const btnRestaurarRespaldo = document.getElementById('btn-restaurar-respaldo');
+const inputRespaldo = document.getElementById('input-respaldo');
+
+if (btnDescargarRespaldo) {
+    btnDescargarRespaldo.addEventListener('click', descargarRespaldo);
+}
+
+if (btnRestaurarRespaldo && inputRespaldo) {
+    btnRestaurarRespaldo.addEventListener('click', () => inputRespaldo.click());
+    inputRespaldo.addEventListener('change', () => {
+        if (inputRespaldo.files && inputRespaldo.files[0]) {
+            restaurarRespaldo(inputRespaldo.files[0]);
+        }
+        inputRespaldo.value = '';
+    });
+}
+
+// ============================================
 // MODERACIÓN DE COMENTARIOS
 // ============================================
 

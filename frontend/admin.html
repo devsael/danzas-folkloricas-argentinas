@@ -402,6 +402,20 @@
                     <div id="config-status" class="form-status"></div>
                 </form>
             </div>
+
+            <div class="admin-form-card" style="margin-top:2rem;">
+                <h3>💾 Respaldo de datos</h3>
+                <p class="admin-hint" style="margin-bottom:1rem;">
+                    Descargá una copia de seguridad con <strong>todo</strong> tu contenido (danzas, eventos, comentarios, cursos, códigos y configuración).
+                    Guardala en tu PC por si la base de datos de Render se perdiera. También podés restaurar un respaldo guardado.
+                </p>
+                <div class="form-group">
+                    <button type="button" class="submit-button" id="btn-descargar-respaldo" style="margin-bottom:0.5rem;">⬇️ Descargar respaldo (JSON)</button>
+                    <button type="button" class="submit-button" id="btn-restaurar-respaldo" style="background:#8B6F47;">⬆️ Restaurar respaldo</button>
+                    <input type="file" id="input-respaldo" accept=".json,application/json" style="display:none;">
+                </div>
+                <div id="respaldo-status" class="form-status"></div>
+            </div>
         </div>
     </div>
 

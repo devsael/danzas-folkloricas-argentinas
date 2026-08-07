@@ -581,6 +581,118 @@ app.put('/api/config', requireAdminKey, async (req, res) => {
   }
 });
 
+// ===== RESPALDO (exportar / restaurar) =====
+
+// GET /api/backup - Descarga un JSON con todos los datos (solo admin)
+app.get('/api/backup', requireAdminKey, rateLimit(10, 60000), async (req, res) => {
+  try {
+    const [danzas, eventos, comentarios, cursos, codigos, config] = await Promise.all([
+      db.all('SELECT * FROM danzas ORDER BY id ASC'),
+      db.all('SELECT * FROM eventos ORDER BY id ASC'),
+      db.all('SELECT * FROM comentarios ORDER BY id ASC'),
+      db.all('SELECT * FROM cursos ORDER BY id ASC'),
+      db.all('SELECT * FROM codigos ORDER BY id ASC'),
+      db.all('SELECT * FROM config ORDER BY clave ASC')
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        app: 'danzas-folkloricas-argentinas',
+        version: 1,
+        generado: new Date().toISOString(),
+        danzas, eventos, comentarios, cursos, codigos, config
+      }
+    });
+  } catch (error) {
+    return handleError(res, error, req);
+  }
+});
+
+// POST /api/restore - Reemplaza todos los datos con un respaldo (solo admin)
+// Recibe el JSON completo generado por /api/backup (o su campo "data").
+app.post('/api/restore', requireAdminKey, rateLimit(3, 60000), async (req, res) => {
+  try {
+    const body = req.body && req.body.data ? req.body.data : (req.body || {});
+    const b = (tabla) => (Array.isArray(body[tabla]) ? body[tabla] : []);
+
+    const danzasArr = b('danzas');
+    if (danzasArr.length === 0 && Object.keys(body).length === 0) {
+      return res.status(400).json({ success: false, error: 'No se recibió un respaldo válido' });
+    }
+
+    // Limpiar en orden seguro
+    await db.run('DELETE FROM codigos');
+    await db.run('DELETE FROM cursos');
+    await db.run('DELETE FROM comentarios');
+    await db.run('DELETE FROM eventos');
+    await db.run('DELETE FROM danzas');
+    await db.run('DELETE FROM config');
+
+    // Reinsertar con los ids originales
+    for (const d of danzasArr) {
+      await db.run(
+        'INSERT INTO danzas (id, nombre, region, caracter, historia, coreografia, video_url, imagen_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        [d.id, d.nombre, d.region, d.caracter || 'festiva', d.historia || null, d.coreografia || null, d.video_url || null, d.imagen_url || null]
+      );
+    }
+    for (const ev of b('eventos')) {
+      await db.run(
+        'INSERT INTO eventos (id, titulo, fecha, lugar, descripcion) VALUES (?, ?, ?, ?, ?)',
+        [ev.id, ev.titulo, ev.fecha, ev.lugar || null, ev.descripcion || null]
+      );
+    }
+    for (const c of b('comentarios')) {
+      await db.run(
+        'INSERT INTO comentarios (id, nombre, mensaje, fecha, estado) VALUES (?, ?, ?, ?, ?)',
+        [c.id, c.nombre, c.mensaje, c.fecha || new Date().toISOString(), c.estado || 'aprobado']
+      );
+    }
+    for (const cur of b('cursos')) {
+      await db.run(
+        'INSERT INTO cursos (id, nombre, descripcion, drive_url, creado) VALUES (?, ?, ?, ?, ?)',
+        [cur.id, cur.nombre, cur.descripcion || null, cur.drive_url, cur.creado || new Date().toISOString()]
+      );
+    }
+    for (const cod of b('codigos')) {
+      await db.run(
+        'INSERT INTO codigos (id, codigo, curso_id, estado, nombre_cliente, usado, creado) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [cod.id, cod.codigo, cod.curso_id, cod.estado || 'activo', cod.nombre_cliente || null, cod.usado || null, cod.creado || new Date().toISOString()]
+      );
+    }
+    for (const k of b('config')) {
+      await db.run(
+        'INSERT INTO config (clave, valor) VALUES (?, ?)',
+        [k.clave, k.valor],
+        { returning: false }
+      );
+    }
+
+    // Reiniciar secuencias en PostgreSQL para que los próximos inserts no colisionen
+    if (db.isPostgres) {
+      for (const tabla of ['danzas', 'eventos', 'comentarios', 'cursos', 'codigos']) {
+        await db.run(`SELECT setval(pg_get_serial_sequence('${tabla}', 'id'), COALESCE((SELECT MAX(id) FROM ${tabla}), 1), true)`);
+      }
+    }
+
+    res.json({
+      success: true,
+      data: {
+        restaurados: {
+          danzas: danzasArr.length,
+          eventos: b('eventos').length,
+          comentarios: b('comentarios').length,
+          cursos: b('cursos').length,
+          codigos: b('codigos').length,
+          config: b('config').length
+        }
+      }
+    });
+  } catch (error) {
+    return handleError(res, error, req);
+  }
+});
+
 // ===== COMENTARIOS =====
 
 // GET /api/comentarios - Comentarios aprobados (público) con paginación
@@ -779,6 +891,8 @@ async function iniciar() {
     console.log(`   POST   /api/mis-cursos          🔑 requiere código`);
     console.log(`   GET    /api/config`);
     console.log(`   PUT    /api/config              🔒 admin`);
+    console.log(`   GET    /api/backup              🔒 admin`);
+    console.log(`   POST   /api/restore             🔒 admin`);
     console.log(`   GET    /api/comentarios?page=&limit=`);
     console.log(`   GET    /api/comentarios/pendientes  🔒 admin`);
     console.log(`   GET    /api/comentarios/rechazados  🔒 admin`);
