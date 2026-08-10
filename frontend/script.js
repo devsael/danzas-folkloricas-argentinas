@@ -90,6 +90,17 @@ function urlSegura(url) {
     return '';
 }
 
+// Posiciones válidas de imagen (evita que entren valores raros)
+const POSICIONES_IMAGEN = [
+    'left top', 'center top', 'right top',
+    'left center', 'center center', 'right center',
+    'left bottom', 'center bottom', 'right bottom'
+];
+
+function posicionImagen(valor) {
+    return POSICIONES_IMAGEN.includes(String(valor || '').trim()) ? valor : 'center center';
+}
+
 // Convierte cualquier enlace de YouTube al formato embed (el único que acepta
 // el iframe): watch?v=, youtu.be, shorts y live. Si no es de YouTube, devuelve
 // la URL tal cual (o vacío si no es http/https).
@@ -286,7 +297,7 @@ function abrirModalDanza(id) {
     const modalImagen = document.getElementById('modal-imagen');
     const imgUrl = urlSegura(urlImagenParaMostrar(danza.imagen_url));
     if (imgUrl) {
-        modalImagen.innerHTML = `<img src="${imgUrl}" alt="${escapeHtml(danza.nombre)}" loading="lazy">`;
+        modalImagen.innerHTML = `<img src="${imgUrl}" alt="${escapeHtml(danza.nombre)}" loading="lazy" style="object-position:${posicionImagen(danza.imagen_posicion)};">`;
         modalImagen.style.display = 'block';
     } else {
         modalImagen.style.display = 'none';
@@ -400,8 +411,9 @@ function mostrarDanzas(danzas) {
         danzasCache.set(danza.id, danza);
         const inicial = (danza.nombre || '?').trim().charAt(0).toUpperCase();
         const imgUrl = urlSegura(urlImagenParaMostrar(danza.imagen_url));
+        const posicion = posicionImagen(danza.imagen_posicion);
         const imagenHtml = imgUrl
-            ? `<div class="danza-image"><img src="${imgUrl}" alt="${escapeHtml(danza.nombre)}" loading="lazy"></div>`
+            ? `<div class="danza-image"><img src="${imgUrl}" alt="${escapeHtml(danza.nombre)}" loading="lazy" style="object-position:${posicion};"></div>`
             : `<div class="danza-image"><span class="danza-inicial">${escapeHtml(inicial)}</span></div>`;
         const card = document.createElement('div');
         card.className = 'danza-card';
@@ -847,8 +859,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     console.log('Iniciando aplicación de Danzas Folklóricas');
     console.log('📡 Conectando a API:', API_URL);
 
-    // Empezar siempre desde arriba al cargar/recargar (el navegador a veces
-    // deja la página en el medio del scroll).
+    // Empezar siempre desde arriba al cargar/recargar. scrollRestoration='manual'
+    // evita que el navegador restaure la posición vieja después de F5 (antes la
+    // página quedaba donde estabas, por ejemplo en el libro de visitas).
+    if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
     if (!location.hash) window.scrollTo(0, 0);
 
     const footerYear = document.getElementById('footer-year');

@@ -46,8 +46,8 @@
             </div>
             <ul class="nav-menu">
                 <li><a href="#inicio" class="nav-link active">Inicio</a></li>
-                <li><a href="#plan-estudio" class="nav-link">Plan de Estudio</a></li>
                 <li><a href="#danzas" class="nav-link">Danzas</a></li>
+                <li><a href="#plan-estudio" class="nav-link">Plan de Estudio</a></li>
                 <li><a href="#recursos" class="nav-link">Recursos</a></li>
                 <li><a href="#mis-cursos" class="nav-link">Mis Cursos</a></li>
                 <li><a href="#eventos" class="nav-link">Eventos</a></li>
@@ -72,7 +72,29 @@
                 <a href="#" id="hero-drive-link" class="cta-button cta-drive" target="_blank" rel="noopener noreferrer" style="display:none;">📘 Descargar Curso</a>
             </div>
         </div>
-        <a href="#plan-estudio" class="hero-scroll" aria-label="Bajar al contenido">▾</a>
+        <a href="#danzas" class="hero-scroll" aria-label="Bajar al contenido">▾</a>
+    </section>
+
+    <!-- SECCIÓN: DANZAS -->
+    <section id="danzas" class="danzas-section">
+        <div class="container">
+            <h2 class="section-title">💃 Danzas Folklóricas</h2>
+            <p class="section-subtitle">Conocé la historia, técnica y belleza de cada danza</p>
+
+            <div class="danzas-buscador">
+                <input type="text" id="danzas-busqueda" placeholder="🔍 Buscar danza por nombre..." autocomplete="off">
+            </div>
+
+            <div id="danzas-lista" class="danzas-grid">
+                <div class="loading">Cargando danzas...</div>
+            </div>
+
+            <div id="danzas-aviso" class="danzas-aviso" style="display:none;">
+                ⚠️ Mostrando la copia guardada: el servidor no respondió. La lista se actualiza automáticamente cuando vuelve.
+            </div>
+
+            <div id="danzas-paginacion" class="pagination" style="display:none;"></div>
+        </div>
     </section>
 
     <!-- SECCIÓN: PLAN DE ESTUDIO -->
@@ -147,28 +169,6 @@
             <div class="plan-contacto">
                 <a href="mailto:devmisael.sm@gmail.com" class="cta-contacto">📩 ¿Tenés dudas o querés anotarte? Escribime</a>
             </div>
-        </div>
-    </section>
-
-    <!-- SECCIÓN: DANZAS -->
-    <section id="danzas" class="danzas-section">
-        <div class="container">
-            <h2 class="section-title">💃 Danzas Folklóricas</h2>
-            <p class="section-subtitle">Conocé la historia, técnica y belleza de cada danza</p>
-
-            <div class="danzas-buscador">
-                <input type="text" id="danzas-busqueda" placeholder="🔍 Buscar danza por nombre..." autocomplete="off">
-            </div>
-
-            <div id="danzas-lista" class="danzas-grid">
-                <div class="loading">Cargando danzas...</div>
-            </div>
-
-            <div id="danzas-aviso" class="danzas-aviso" style="display:none;">
-                ⚠️ Mostrando la copia guardada: el servidor no respondió. La lista se actualiza automáticamente cuando vuelve.
-            </div>
-
-            <div id="danzas-paginacion" class="pagination" style="display:none;"></div>
         </div>
     </section>
 

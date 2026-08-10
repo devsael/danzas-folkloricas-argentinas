@@ -129,6 +129,17 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// POSICIONES válidas para la imagen de una danza (se usa con object-position)
+const POSICIONES_IMAGEN = [
+  'left top', 'center top', 'right top',
+  'left center', 'center center', 'right center',
+  'left bottom', 'center bottom', 'right bottom'
+];
+
+function posicionImagenValida(valor) {
+  return POSICIONES_IMAGEN.includes(valor) ? valor : 'center center';
+}
+
 // ===== DANZAS =====
 
 // GET /api/danzas - Listar danzas con paginación y búsqueda opcional
@@ -176,7 +187,7 @@ app.get('/api/danzas/:id', validarId, async (req, res) => {
 // POST /api/danzas - Crear una nueva danza (solo para admin)
 app.post('/api/danzas', requireAdminKey, async (req, res) => {
   try {
-    const { nombre, region, caracter, historia, coreografia, video_url, imagen_url } = req.body;
+    const { nombre, region, caracter, historia, coreografia, video_url, imagen_url, imagen_posicion } = req.body;
     
     // Validaciones
     if (!nombre || !region) {
@@ -184,13 +195,13 @@ app.post('/api/danzas', requireAdminKey, async (req, res) => {
     }
     
     const result = await db.run(
-      'INSERT INTO danzas (nombre, region, caracter, historia, coreografia, video_url, imagen_url) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [nombre, region, caracter || 'festiva', historia || '', coreografia || '', video_url || '', imagen_url || '']
+      'INSERT INTO danzas (nombre, region, caracter, historia, coreografia, video_url, imagen_url, imagen_posicion) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [nombre, region, caracter || 'festiva', historia || '', coreografia || '', video_url || '', imagen_url || '', posicionImagenValida(imagen_posicion)]
     );
     
     res.status(201).json({ 
       success: true, 
-      data: { id: result.lastID, nombre, region, caracter: caracter || 'festiva', historia, coreografia, video_url, imagen_url }
+      data: { id: result.lastID, nombre, region, caracter: caracter || 'festiva', historia, coreografia, video_url, imagen_url, imagen_posicion: posicionImagenValida(imagen_posicion) }
     });
   } catch (error) {
     return handleError(res, error, req);
@@ -200,7 +211,7 @@ app.post('/api/danzas', requireAdminKey, async (req, res) => {
 // PUT /api/danzas/:id - Editar una danza existente (solo para admin)
 app.put('/api/danzas/:id', requireAdminKey, validarId, async (req, res) => {
   try {
-    const { nombre, region, caracter, historia, coreografia, video_url, imagen_url } = req.body;
+    const { nombre, region, caracter, historia, coreografia, video_url, imagen_url, imagen_posicion } = req.body;
 
     // Validaciones
     if (!nombre || !region) {
@@ -213,13 +224,13 @@ app.put('/api/danzas/:id', requireAdminKey, validarId, async (req, res) => {
     }
 
     await db.run(
-      'UPDATE danzas SET nombre = ?, region = ?, caracter = ?, historia = ?, coreografia = ?, video_url = ?, imagen_url = ? WHERE id = ?',
-      [nombre, region, caracter || 'festiva', historia || '', coreografia || '', video_url || '', imagen_url || '', req.params.id]
+      'UPDATE danzas SET nombre = ?, region = ?, caracter = ?, historia = ?, coreografia = ?, video_url = ?, imagen_url = ?, imagen_posicion = ? WHERE id = ?',
+      [nombre, region, caracter || 'festiva', historia || '', coreografia || '', video_url || '', imagen_url || '', posicionImagenValida(imagen_posicion), req.params.id]
     );
 
     res.json({
       success: true,
-      data: { id: Number(req.params.id), nombre, region, caracter: caracter || 'festiva', historia, coreografia, video_url, imagen_url }
+      data: { id: Number(req.params.id), nombre, region, caracter: caracter || 'festiva', historia, coreografia, video_url, imagen_url, imagen_posicion: posicionImagenValida(imagen_posicion) }
     });
   } catch (error) {
     return handleError(res, error, req);
@@ -768,8 +779,8 @@ app.post('/api/restore', requireAdminKey, rateLimit(3, 60000), async (req, res) 
     // Reinsertar con los ids originales
     for (const d of danzasArr) {
       await db.run(
-        'INSERT INTO danzas (id, nombre, region, caracter, historia, coreografia, video_url, imagen_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-        [d.id, d.nombre, d.region, d.caracter || 'festiva', d.historia || null, d.coreografia || null, d.video_url || null, d.imagen_url || null]
+        'INSERT INTO danzas (id, nombre, region, caracter, historia, coreografia, video_url, imagen_url, imagen_posicion) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [d.id, d.nombre, d.region, d.caracter || 'festiva', d.historia || null, d.coreografia || null, d.video_url || null, d.imagen_url || null, d.imagen_posicion || 'center center']
       );
     }
     for (const ev of b('eventos')) {
@@ -1007,6 +1018,7 @@ async function iniciar() {
     await ensureColumn('comentarios', 'estado', "TEXT NOT NULL DEFAULT 'aprobado'");
     await ensureColumn('danzas', 'caracter', "TEXT DEFAULT 'festiva'");
     await ensureColumn('danzas', 'imagen_url', 'TEXT');
+    await ensureColumn('danzas', 'imagen_posicion', "TEXT DEFAULT 'center center'");
     console.log('✓ Migraciones aplicadas');
   } catch (err) {
     console.error('Error en migraciones:', err.message);

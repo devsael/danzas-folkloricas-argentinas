@@ -192,6 +192,49 @@
             color: #8B6F47;
             margin-top: 0.3rem;
         }
+        .danza-img-preview {
+            width: 100%;
+            height: 180px;
+            background: #FFF;
+            border: 2px dashed #D4A574;
+            border-radius: 8px;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #999;
+            margin-bottom: 0.7rem;
+        }
+        .danza-img-preview img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .danza-img-pos-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0.4rem;
+            max-width: 220px;
+            margin-bottom: 0.5rem;
+        }
+        .danza-img-pos-grid button {
+            border: 2px solid #D4A574;
+            background: #FFF;
+            border-radius: 6px;
+            padding: 0.5rem;
+            cursor: pointer;
+            font-size: 1rem;
+            color: #8B6F47;
+            transition: all 0.15s;
+        }
+        .danza-img-pos-grid button:hover {
+            background: #F5EFE6;
+        }
+        .danza-img-pos-grid button.active {
+            background: #C1410C;
+            border-color: #C1410C;
+            color: #FEFBF7;
+        }
     </style>
 </head>
 <body>
@@ -260,6 +303,25 @@
                         <label for="d-imagen">URL de imagen (opcional)</label>
                         <input type="text" id="d-imagen" placeholder="Enlace de Google Drive o URL directa de imagen">
                         <p class="admin-hint">💡 Pegá el enlace de la imagen en Drive. El sitio lo convierte automáticamente al formato que se muestra en las tarjetas.</p>
+                    </div>
+                    <div class="form-group" id="d-imagen-pos-group">
+                        <label>Posición de la imagen (elegí qué parte se ve)</label>
+                        <div class="danza-img-preview" id="danza-img-preview">
+                            <span>Sin imagen</span>
+                        </div>
+                        <div class="danza-img-pos-grid" id="danza-img-pos-grid">
+                            <button type="button" data-pos="left top">↖</button>
+                            <button type="button" data-pos="center top">↑</button>
+                            <button type="button" data-pos="right top">↗</button>
+                            <button type="button" data-pos="left center">←</button>
+                            <button type="button" data-pos="center center">●</button>
+                            <button type="button" data-pos="right center">→</button>
+                            <button type="button" data-pos="left bottom">↙</button>
+                            <button type="button" data-pos="center bottom">↓</button>
+                            <button type="button" data-pos="right bottom">↘</button>
+                        </div>
+                        <input type="hidden" id="d-imagen-pos" value="center center">
+                        <p class="admin-hint">💡 Hacé click en la grilla para elegir qué parte de la foto se muestra en la tarjeta (arriba, centro, abajo, izquierda, derecha...).</p>
                     </div>
                     <button type="submit" class="submit-button" id="danza-submit-btn">Guardar Danza</button>
                     <button type="button" class="submit-button" id="danza-cancel-btn" style="display:none; background:#999; margin-left:0.5rem;">Cancelar edición</button>

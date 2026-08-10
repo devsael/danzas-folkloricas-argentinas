@@ -156,6 +156,16 @@ async function main() {
     }
   }
 
+  // Migración: asegurar columna imagen_posicion en danzas
+  if (db.isPostgres) {
+    await db.run("ALTER TABLE danzas ADD COLUMN IF NOT EXISTS imagen_posicion TEXT DEFAULT 'center center'");
+  } else {
+    const cols = await db.all('PRAGMA table_info(danzas)');
+    if (!cols.some(c => c.name === 'imagen_posicion')) {
+      await db.run("ALTER TABLE danzas ADD COLUMN imagen_posicion TEXT DEFAULT 'center center'");
+    }
+  }
+
   // Solo sembrar si las tablas están vacías (no pisar datos del admin en cada deploy)
   const countD = await db.get('SELECT COUNT(*) AS c FROM danzas');
   const countE = await db.get('SELECT COUNT(*) AS c FROM eventos');

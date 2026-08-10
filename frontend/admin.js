@@ -161,6 +161,56 @@ const danzaFormTitle = document.getElementById('danza-form-title');
 
 let danzasCache = [];
 
+// ============================================
+// POSICIÓN DE IMAGEN DE LAS DANZAS
+// ============================================
+
+function actualizarPreviewImagen() {
+    const preview = document.getElementById('danza-img-preview');
+    if (!preview) return;
+
+    const url = urlSeguraAdmin(urlImagenParaMostrar(document.getElementById('d-imagen').value.trim()));
+    const pos = document.getElementById('d-imagen-pos').value || 'center center';
+
+    if (url) {
+        preview.innerHTML = `<img src="${url}" alt="Vista previa" style="object-position:${pos};">`;
+    } else {
+        preview.innerHTML = '<span>Sin imagen</span>';
+    }
+}
+
+function setPosicionImagen(pos) {
+    const valida = ['left top', 'center top', 'right top', 'left center', 'center center', 'right center', 'left bottom', 'center bottom', 'right bottom']
+        .includes(pos) ? pos : 'center center';
+
+    document.getElementById('d-imagen-pos').value = valida;
+    document.querySelectorAll('#danza-img-pos-grid button').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.pos === valida);
+    });
+    actualizarPreviewImagen();
+}
+
+function resetPosicionImagen() {
+    setPosicionImagen('center center');
+}
+
+// Vista previa en vivo al pegar la URL
+const danzaImagenInput = document.getElementById('d-imagen');
+if (danzaImagenInput) {
+    danzaImagenInput.addEventListener('input', actualizarPreviewImagen);
+}
+
+// Grilla de posiciones
+const danzaPosGrid = document.getElementById('danza-img-pos-grid');
+if (danzaPosGrid) {
+    danzaPosGrid.addEventListener('click', (e) => {
+        const btn = e.target.closest('button[data-pos]');
+        if (btn) setPosicionImagen(btn.dataset.pos);
+    });
+}
+
+resetPosicionImagen();
+
 formDanza.addEventListener('submit', async (e) => {
     e.preventDefault();
 
@@ -172,6 +222,7 @@ formDanza.addEventListener('submit', async (e) => {
     const coreografia = document.getElementById('d-coreografia').value.trim();
     const video_url = document.getElementById('d-video').value.trim();
     const imagen_url = document.getElementById('d-imagen').value.trim();
+    const imagen_posicion = document.getElementById('d-imagen-pos').value || 'center center';
 
     if (!nombre || !region || !caracter) {
         mostrarEstado('danza-status', 'Nombre, región y carácter son obligatorios', 'error');
@@ -186,7 +237,7 @@ formDanza.addEventListener('submit', async (e) => {
         const response = await fetch(url, {
             method,
             headers: adminHeaders(),
-            body: JSON.stringify({ nombre, region, caracter, historia, coreografia, video_url, imagen_url })
+            body: JSON.stringify({ nombre, region, caracter, historia, coreografia, video_url, imagen_url, imagen_posicion })
         });
 
         const json = await response.json();
@@ -219,6 +270,7 @@ function cancelarEdicionDanza() {
     danzaFormTitle.textContent = 'Nueva Danza';
     danzaSubmitBtn.textContent = 'Guardar Danza';
     danzaCancelBtn.style.display = 'none';
+    resetPosicionImagen();
 }
 
 function editarDanza(id) {
@@ -233,6 +285,8 @@ function editarDanza(id) {
     document.getElementById('d-coreografia').value = danza.coreografia || '';
     document.getElementById('d-video').value = danza.video_url || '';
     document.getElementById('d-imagen').value = danza.imagen_url || '';
+
+    setPosicionImagen(danza.imagen_posicion || 'center center');
 
     danzaFormTitle.textContent = `Editando: ${danza.nombre}`;
     danzaSubmitBtn.textContent = 'Actualizar Danza';
