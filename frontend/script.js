@@ -250,13 +250,22 @@ window.addEventListener('scroll', () => {
 const modal = document.getElementById('modal-danza');
 const closeBtn = document.querySelector('.close');
 
-closeBtn.addEventListener('click', () => {
+function cerrarModal() {
     modal.classList.remove('show');
-});
+    document.body.classList.remove('modal-abierto');
+}
+
+closeBtn.addEventListener('click', cerrarModal);
 
 window.addEventListener('click', (event) => {
     if (event.target === modal) {
-        modal.classList.remove('show');
+        cerrarModal();
+    }
+});
+
+window.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+        cerrarModal();
     }
 });
 
@@ -295,6 +304,7 @@ function abrirModalDanza(id) {
     }
 
     modal.classList.add('show');
+    document.body.classList.add('modal-abierto');
 }
 
 // ============================================
@@ -306,13 +316,25 @@ function abrirModalDanza(id) {
 const DANZAS_LIMIT = 12;
 let danzaPage = 1;
 let danzasRequestId = 0;
+let danzasDesdeCache = false;
 
 async function cargarDanzas(page = 1) {
     const requestId = ++danzasRequestId;
     const lista = document.getElementById('danzas-lista');
-    lista.innerHTML = '<div class="loading">Cargando danzas...</div>';
-
     const termino = document.getElementById('danzas-busqueda').value.trim();
+
+    // Primera carga: mostramos la copia guardada al instante (sin esperar a Render).
+    // Si la API responde, después se reemplaza con los datos más recientes.
+    if (page === 1 && !termino && window.DANZAS_CACHE && !danzasDesdeCache) {
+        danzasDesdeCache = true;
+        mostrarDanzas(window.DANZAS_CACHE);
+        renderPaginacion('danzas-paginacion',
+            { page: 1, limit: DANZAS_LIMIT, total: window.DANZAS_CACHE.length, totalPages: 1 },
+            cargarDanzas, 'danzas');
+    } else {
+        lista.innerHTML = '<div class="loading">Cargando danzas...</div>';
+    }
+
     let url = `${API_URL}/api/danzas?page=${page}&limit=${DANZAS_LIMIT}`;
     if (termino) {
         url += `&search=${encodeURIComponent(termino)}`;
@@ -327,14 +349,30 @@ async function cargarDanzas(page = 1) {
         if (json.success) {
             danzaPage = json.pagination.page;
             mostrarDanzas(json.data);
-            renderPaginacion('danzas-paginacion', json.pagination, cargarDanzas);
+            renderPaginacion('danzas-paginacion', json.pagination, cargarDanzas, 'danzas');
+            const aviso = document.getElementById('danzas-aviso');
+            if (aviso) aviso.style.display = 'none';
         } else {
             mostrarError('danzas-lista', 'Error al cargar las danzas');
         }
     } catch (error) {
         if (requestId !== danzasRequestId) return;
         console.error('Error al conectar con la API de danzas:', error);
-        mostrarError('danzas-lista', 'No se pudo conectar con el servidor');
+
+        // Respaldo: si la API no responde, usamos la copia guardada en el HTML
+        if (window.DANZAS_CACHE) {
+            const filtradas = termino
+                ? window.DANZAS_CACHE.filter(d => (d.nombre || '').toLowerCase().includes(termino.toLowerCase()))
+                : window.DANZAS_CACHE;
+            mostrarDanzas(filtradas);
+            renderPaginacion('danzas-paginacion',
+                { page: 1, limit: DANZAS_LIMIT, total: filtradas.length, totalPages: 1 },
+                cargarDanzas, 'danzas');
+            const aviso = document.getElementById('danzas-aviso');
+            if (aviso) aviso.style.display = 'block';
+        } else {
+            mostrarError('danzas-lista', 'No se pudo conectar con el servidor');
+        }
     }
 }
 
@@ -399,7 +437,7 @@ async function cargarEventos(page = 1) {
         if (json.success) {
             eventoPage = json.pagination.page;
             mostrarEventos(json.data);
-            renderPaginacion('eventos-paginacion', json.pagination, cargarEventos);
+            renderPaginacion('eventos-paginacion', json.pagination, cargarEventos, 'eventos');
         } else {
             mostrarError('eventos-lista', 'Error al cargar los eventos');
         }
@@ -453,7 +491,7 @@ async function cargarComentarios(page = 1) {
         if (json.success) {
             comentarioPage = json.pagination.page;
             mostrarComentarios(json.data);
-            renderPaginacion('comentarios-paginacion', json.pagination, cargarComentarios);
+            renderPaginacion('comentarios-paginacion', json.pagination, cargarComentarios, 'comentarios');
         } else {
             console.error('Error al cargar comentarios');
         }
@@ -497,7 +535,7 @@ function mostrarComentarios(comentarios) {
 // PAGINACIÓN
 // ============================================
 
-function renderPaginacion(containerId, pagination, callback) {
+function renderPaginacion(containerId, pagination, callback, sectionId) {
     const container = document.getElementById(containerId);
     if (!container) return;
 
@@ -512,12 +550,22 @@ function renderPaginacion(containerId, pagination, callback) {
 
     const { page, totalPages } = pagination;
 
+    // Al cambiar de página, subimos al inicio de la sección para que la
+    // persona vea el resultado desde arriba (no queda perdido en el medio).
+    const irAlInicio = () => {
+        const el = document.getElementById(sectionId);
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
+
     const crearBtnPagina = (num, activo) => {
         const btn = document.createElement('button');
         btn.className = `page-btn${activo ? ' active' : ''}`;
         btn.textContent = num;
         btn.disabled = activo;
-        btn.addEventListener('click', () => callback(num));
+        btn.addEventListener('click', () => {
+            callback(num);
+            irAlInicio();
+        });
         return btn;
     };
 
@@ -532,7 +580,10 @@ function renderPaginacion(containerId, pagination, callback) {
     btnPrev.className = 'page-btn page-arrow';
     btnPrev.textContent = '‹';
     btnPrev.disabled = page <= 1;
-    btnPrev.addEventListener('click', () => callback(page - 1));
+    btnPrev.addEventListener('click', () => {
+        callback(page - 1);
+        irAlInicio();
+    });
     container.appendChild(btnPrev);
 
     let inicio = Math.max(1, page - 2);
@@ -557,7 +608,10 @@ function renderPaginacion(containerId, pagination, callback) {
     btnNext.className = 'page-btn page-arrow';
     btnNext.textContent = '›';
     btnNext.disabled = page >= totalPages;
-    btnNext.addEventListener('click', () => callback(page + 1));
+    btnNext.addEventListener('click', () => {
+        callback(page + 1);
+        irAlInicio();
+    });
     container.appendChild(btnNext);
 }
 
@@ -793,6 +847,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     console.log('Iniciando aplicación de Danzas Folklóricas');
     console.log('📡 Conectando a API:', API_URL);
 
+    // Empezar siempre desde arriba al cargar/recargar (el navegador a veces
+    // deja la página en el medio del scroll).
+    if (!location.hash) window.scrollTo(0, 0);
+
     const footerYear = document.getElementById('footer-year');
     if (footerYear) footerYear.textContent = new Date().getFullYear();
 
@@ -811,29 +869,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Lazy loading para imágenes con data-src
     initLazyImages();
 
-    // Verificar conexión con API
-    const apiOk = await verificarAPI();
-
-    if (apiOk) {
-        // Cargar todos los datos
-        await Promise.all([
-            cargarDanzas(1),
-            cargarEventos(1),
-            cargarComentarios(1)
-        ]);
-        ocultarDespertando();
-        console.log('✓ Datos cargados correctamente');
-    } else {
-        console.warn('⚠️ No se pudo conectar con la API');
-        ocultarDespertando();
-        mostrarErrorConexion();
-        document.getElementById('danzas-lista').innerHTML =
-            '<p class="loading">⚠️ Error de conexión con el servidor. Por favor, intenta más tarde.</p>';
-        document.getElementById('eventos-lista').innerHTML =
-            '<p class="loading">⚠️ Error de conexión con el servidor.</p>';
-        document.getElementById('comentarios-grid').innerHTML =
-            '<p class="loading">⚠️ Error de conexión con el servidor.</p>';
-    }
+    // Cargar los datos en paralelo. Las danzas se muestran al instante desde la
+    // copia guardada y se actualizan si la API responde; si no, queda la copia.
+    await Promise.all([
+        cargarDanzas(1),
+        cargarEventos(1),
+        cargarComentarios(1)
+    ]);
+    ocultarDespertando();
+    console.log('✓ Datos cargados correctamente');
 });
 
 // Recargar comentarios cada 30 segundos
