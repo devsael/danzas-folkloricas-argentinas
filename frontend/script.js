@@ -202,16 +202,27 @@ function tarjetasDeItems(items) {
     `).join('');
 }
 
+// Convierte cualquier enlace de Google Drive en la URL de streaming del
+// backend (Google bloquea reproducir directo desde Drive en páginas ajenas).
+function urlAudioStreaming(url) {
+    const m1 = url.match(/[?&]id=([^&]+)/);
+    const m2 = url.match(/\/d\/([^/]+)/);
+    const id = m1 ? m1[1] : (m2 ? m2[1] : null);
+    if (id) return `${API_URL}/api/audio/${encodeURIComponent(id)}`;
+    return urlSegura(url);
+}
+
 // Tarjeta de audio con reproductor embebido (memoriza la posición al expandir/colapsar)
 function tarjetasDeAudio(items) {
     return items.map(item => {
-        const src = urlSegura(item.url);
+        const src = urlAudioStreaming(item.url);
+        const enlaceDescarga = urlSegura(item.url);
         return `
         <div class="recurso-card recurso-card-audio">
             <h4>${escapeHtml(item.titulo)}</h4>
             ${item.descripcion ? `<p>${escapeHtml(item.descripcion)}</p>` : ''}
-            ${src ? `<audio controls preload="none" src="${src}"></audio>` : ''}
-            <a href="${src}" target="_blank" rel="noopener noreferrer" class="recurso-button">Descargar</a>
+            ${src ? `<audio controls preload="metadata" src="${src}"></audio>` : ''}
+            ${enlaceDescarga ? `<a href="${enlaceDescarga}" target="_blank" rel="noopener noreferrer" class="recurso-button">Descargar</a>` : ''}
         </div>
     `;
     }).join('');

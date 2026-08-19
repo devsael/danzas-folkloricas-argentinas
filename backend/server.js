@@ -675,6 +675,55 @@ app.delete('/api/recursos/:id', requireAdminKey, validarId, async (req, res) => 
   }
 });
 
+// ===== STREAMING DE AUDIO DESDE GOOGLE DRIVE =====
+
+// Google bloquea el streaming directo desde otras webs (403 por referer).
+// Este endpoint descarga el MP3 del lado del servidor y lo re-transmite,
+// para que el reproductor <audio> del sitio pueda reproducirlo. El enlace a
+// Drive no cambia: alcanza con tener el ID del archivo.
+app.get('/api/audio/:fileId', rateLimit(30, 60000), async (req, res) => {
+  const fileId = String(req.params.fileId || '').replace(/[^A-Za-z0-9_-]/g, '');
+  if (!fileId) {
+    return res.status(400).json({ success: false, error: 'ID de archivo inválido' });
+  }
+
+  const descargar = async (confirmToken) => {
+    const url = `https://drive.google.com/uc?export=download&id=${fileId}${confirmToken ? `&confirm=${confirmToken}` : ''}`;
+    return fetch(url, {
+      redirect: 'follow',
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36' }
+    });
+  };
+
+  try {
+    let upstream = await descargar();
+
+    if (!upstream.ok) {
+      return res.status(502).json({ success: false, error: `Drive respondió ${upstream.status}` });
+    }
+
+    const contentType = upstream.headers.get('content-type') || '';
+
+    // Si Drive devuelve la página de escaneo de virus (archivos grandes),
+    // se extrae el token de confirmación y se reintenta una vez.
+    if (contentType.includes('text/html')) {
+      const html = await upstream.text();
+      const match = html.match(/name="confirm" value="([^"]+)"/);
+      if (!match) {
+        return res.status(502).json({ success: false, error: 'Drive pidió confirmación manual (archivo muy grande)' });
+      }
+      upstream = await descargar(match[1]);
+    }
+
+    res.setHeader('Content-Type', 'audio/mpeg');
+    res.setHeader('Content-Disposition', 'inline');
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+    res.send(Buffer.from(await upstream.arrayBuffer()));
+  } catch (error) {
+    return handleError(res, error, req);
+  }
+});
+
 // ===== VISITAS Y ESTADÍSTICAS =====
 
 // POST /api/visita - Suma una visita (público). Se cuenta una vez por sesión
