@@ -7,6 +7,7 @@
     "start": "cd backend && npm start",
     "dev": "cd backend && npm run dev",
     "init-db": "cd backend && npm run init-db",
-    "generar-cache": "node scripts/generar-cache.js"
+    "generar-cache": "node scripts/generar-cache.js",
+    "dev:all": "node scripts/dev-local.js"
   }
 }

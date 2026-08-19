@@ -1222,6 +1222,31 @@ section:nth-child(even) {
     color: #FEFBF7;
 }
 
+/* Audio: reproductor + agrupación por año */
+.audio-anio {
+    margin-bottom: var(--spacing-lg);
+}
+
+.audio-anio-titulo {
+    font-family: var(--font-primary);
+    color: var(--color-primary);
+    font-size: 1.15rem;
+    margin-bottom: var(--spacing-md);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.recurso-card-audio audio {
+    width: 100%;
+    margin: var(--spacing-sm) 0;
+    border-radius: 8px;
+}
+
+.recurso-card-audio .recurso-button {
+    margin-top: auto;
+}
+
 /* ============================================
    MIS CURSOS (acceso premium)
    ============================================ */

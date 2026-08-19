@@ -598,7 +598,7 @@ app.put('/api/config', requireAdminKey, async (req, res) => {
 app.get('/api/recursos', async (req, res) => {
   try {
     const recursos = await db.all(
-      "SELECT * FROM recursos ORDER BY CASE categoria WHEN 'cursos' THEN 1 WHEN 'libros' THEN 2 ELSE 3 END, lower(titulo) ASC"
+      "SELECT * FROM recursos ORDER BY CASE categoria WHEN 'cursos' THEN 1 WHEN 'libros' THEN 2 WHEN 'audio' THEN 3 ELSE 4 END, lower(titulo) ASC"
     );
     res.json({ success: true, data: recursos });
   } catch (error) {
@@ -611,8 +611,8 @@ app.post('/api/recursos', requireAdminKey, async (req, res) => {
   try {
     const { categoria, titulo, descripcion, url } = req.body;
 
-    if (!['cursos', 'libros', 'imagenes'].includes(categoria)) {
-      return res.status(400).json({ success: false, error: 'Categoría inválida (use cursos, libros o imagenes)' });
+    if (!['cursos', 'libros', 'audio', 'imagenes'].includes(categoria)) {
+      return res.status(400).json({ success: false, error: 'Categoría inválida (use cursos, libros, audio o imagenes)' });
     }
     if (!titulo || !url) {
       return res.status(400).json({ success: false, error: 'Título y enlace son obligatorios' });
@@ -637,8 +637,8 @@ app.put('/api/recursos/:id', requireAdminKey, validarId, async (req, res) => {
   try {
     const { categoria, titulo, descripcion, url } = req.body;
 
-    if (!['cursos', 'libros', 'imagenes'].includes(categoria)) {
-      return res.status(400).json({ success: false, error: 'Categoría inválida (use cursos, libros o imagenes)' });
+    if (!['cursos', 'libros', 'audio', 'imagenes'].includes(categoria)) {
+      return res.status(400).json({ success: false, error: 'Categoría inválida (use cursos, libros, audio o imagenes)' });
     }
     if (!titulo || !url) {
       return res.status(400).json({ success: false, error: 'Título y enlace son obligatorios' });

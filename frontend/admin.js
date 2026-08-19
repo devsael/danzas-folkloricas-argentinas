@@ -1,8 +1,11 @@
 // ============================================
 // CONFIGURACIÓN
 // ============================================
-// IMPORTANTE: debe ser la MISMA URL que usás en script.js
-const API_URL = 'https://danzas-folkloricas-api.onrender.com'; // Backend en Render
+// IMPORTANTE: debe ser la MISMA URL que usás en script.js. En localhost se
+// usa la API local; en GitHub Pages, la de producción.
+const API_URL = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+  ? 'http://localhost:3000'
+  : 'https://danzas-folkloricas-api.onrender.com'; // Backend en Render
 
 // ============================================
 // CLAVE DE ADMINISTRADOR
@@ -835,6 +838,7 @@ let recursosCache = [];
 const ETIQUETAS_CATEGORIA = {
     'cursos': '🎓 Cursos y Talleres',
     'libros': '📚 Bibliografía y Libros',
+    'audio': '🎵 Música y Grabaciones',
     'imagenes': '🖼️ Galería de Imágenes'
 };
 

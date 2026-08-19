@@ -2,8 +2,12 @@
 // CONFIGURACIÓN Y VARIABLES GLOBALES
 // ============================================
 
-// Cambiar esta URL según dónde esté desplegado el backend
-const API_URL = 'https://danzas-folkloricas-api.onrender.com'; // Backend en Render
+// El frontend usa la API de producción cuando está en GitHub Pages y la API
+// local (puerto 3000) cuando se abre desde localhost, para poder probar cambios
+// sin tocar el servidor de producción.
+const API_URL = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+  ? 'http://localhost:3000'
+  : 'https://danzas-folkloricas-api.onrender.com'; // Backend en Render
 
 // ============================================
 // PORTADA DE FONDO
@@ -158,6 +162,7 @@ async function cargarRecursos() {
     const categorias = [
         { clave: 'cursos', titulo: 'Cursos y Talleres', icono: '🎓' },
         { clave: 'libros', titulo: 'Bibliografía y Libros', icono: '📚' },
+        { clave: 'audio', titulo: 'Música y Grabaciones', icono: '🎵' },
         { clave: 'imagenes', titulo: 'Galería de Imágenes', icono: '🖼️' }
     ];
 
@@ -165,18 +170,14 @@ async function cargarRecursos() {
         const catItems = items.filter(i => i.categoria === cat.clave);
         if (catItems.length === 0) return '';
 
-        const cards = catItems.map(item => `
-            <div class="recurso-card">
-                <h4>${escapeHtml(item.titulo)}</h4>
-                ${item.descripcion ? `<p>${escapeHtml(item.descripcion)}</p>` : ''}
-                <a href="${urlSegura(item.url)}" target="_blank" rel="noopener noreferrer" class="recurso-button">Abrir en Google Drive</a>
-            </div>
-        `).join('');
+        const cuerpo = cat.clave === 'audio'
+            ? audioPorAnioHtml(catItems)
+            : `<div class="recursos-grid">${tarjetasDeItems(catItems)}</div>`;
 
         return `
             <div class="recursos-categoria">
                 <h3>${cat.icono} ${cat.titulo}</h3>
-                <div class="recursos-grid">${cards}</div>
+                ${cuerpo}
             </div>
         `;
     }).join('');
@@ -188,6 +189,63 @@ async function cargarRecursos() {
 
     contenedor.innerHTML = html;
     seccion.style.display = 'block';
+}
+
+// Tarjeta genérica (cursos, libros, imágenes)
+function tarjetasDeItems(items) {
+    return items.map(item => `
+        <div class="recurso-card">
+            <h4>${escapeHtml(item.titulo)}</h4>
+            ${item.descripcion ? `<p>${escapeHtml(item.descripcion)}</p>` : ''}
+            <a href="${urlSegura(item.url)}" target="_blank" rel="noopener noreferrer" class="recurso-button">Abrir en Google Drive</a>
+        </div>
+    `).join('');
+}
+
+// Tarjeta de audio con reproductor embebido (memoriza la posición al expandir/colapsar)
+function tarjetasDeAudio(items) {
+    return items.map(item => {
+        const src = urlSegura(item.url);
+        return `
+        <div class="recurso-card recurso-card-audio">
+            <h4>${escapeHtml(item.titulo)}</h4>
+            ${item.descripcion ? `<p>${escapeHtml(item.descripcion)}</p>` : ''}
+            ${src ? `<audio controls preload="none" src="${src}"></audio>` : ''}
+            <a href="${src}" target="_blank" rel="noopener noreferrer" class="recurso-button">Descargar</a>
+        </div>
+    `;
+    }).join('');
+}
+
+// Agrupa los audios por año. El año va en el título (ej: "Zamba - 2020"),
+// así no hace falta cambiar la base de datos. Sin año quedan al final.
+function audioPorAnioHtml(items) {
+    const grupos = {};
+    const sinAnio = [];
+
+    items.forEach(item => {
+        const match = String(item.titulo || '').match(/\b(19|20)\d{2}\b/);
+        if (match) {
+            (grupos[match[0]] = grupos[match[0]] || []).push(item);
+        } else {
+            sinAnio.push(item);
+        }
+    });
+
+    const bloques = Object.keys(grupos)
+        .sort((a, b) => b.localeCompare(a))
+        .map(anio => `
+            <div class="audio-anio">
+                <h4 class="audio-anio-titulo">🎼 ${anio}</h4>
+                <div class="recursos-grid">${tarjetasDeAudio(grupos[anio])}</div>
+            </div>
+        `);
+
+    if (sinAnio.length) {
+        bloques.push(`<div class="recursos-grid">${tarjetasDeAudio(sinAnio)}</div>`);
+    }
+
+    return bloques.join('');
 }
 
 // ============================================
