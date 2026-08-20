@@ -208,10 +208,12 @@ async function cargarRecursos() {
     seccion.style.display = 'block';
 }
 
-// Botón de colaboración (si el admin configuró un enlace de donación)
+// Botón de colaboración (si el admin configuró un enlace de donación).
+// Se valida la URL: si no es http/https segura, no se muestra nada.
 function botonDonar() {
-    if (!configDonar.url) return '';
-    return `<a href="${urlSegura(configDonar.url)}" target="_blank" rel="noopener noreferrer" class="recurso-button recurso-button-donar" title="Apoyar el proyecto">${escapeHtml(configDonar.texto || '🤝 Colaborar')}</a>`;
+    const href = urlSegura(configDonar.url);
+    if (!href) return '';
+    return `<a href="${href}" target="_blank" rel="noopener noreferrer" class="recurso-button recurso-button-donar" title="Apoyar el proyecto">${escapeHtml(configDonar.texto || '🤝 Colaborar')}</a>`;
 }
 
 // Tarjeta genérica (cursos, libros, imágenes)
