@@ -50,6 +50,10 @@ function renderBotonDrive(url, texto) {
     link.style.display = 'inline-block';
 }
 
+// Config de colaboración ("Colaborar") para la sección Recursos.
+// Se carga junto con la configuración del panel admin.
+let configDonar = { url: '', texto: '🤝 Colaborar' };
+
 async function cargarConfiguracion() {
     try {
         const response = await fetch(`${API_URL}/api/config`);
@@ -58,6 +62,10 @@ async function cargarConfiguracion() {
         const cfg = json.data || {};
         aplicarPortada(cfg.hero_background_url);
         renderBotonDrive(cfg.hero_boton_drive_url, cfg.hero_boton_drive_texto);
+        configDonar = {
+            url: cfg.donar_url || '',
+            texto: cfg.donar_texto || '🤝 Colaborar'
+        };
     } catch (error) {
         console.warn('No se pudo cargar la configuración:', error);
     }
@@ -160,46 +168,74 @@ async function cargarRecursos() {
     }
 
     const categorias = [
-        { clave: 'cursos', titulo: 'Cursos y Talleres', icono: '🎓' },
-        { clave: 'libros', titulo: 'Bibliografía y Libros', icono: '📚' },
-        { clave: 'audio', titulo: 'Música y Grabaciones', icono: '🎵' },
-        { clave: 'imagenes', titulo: 'Galería de Imágenes', icono: '🖼️' }
+        { clave: 'cursos', titulo: 'Cursos y Talleres', icono: '🎓', boton: '🎓 Explorar cursos' },
+        { clave: 'libros', titulo: 'Bibliografía y Libros', icono: '📚', boton: '📚 Explorar bibliografía' },
+        { clave: 'audio', titulo: 'Música y Grabaciones', icono: '🎵', boton: '🎵 Explorar música' },
+        { clave: 'imagenes', titulo: 'Galería de Imágenes', icono: '🖼️', boton: '🖼️ Explorar imágenes' }
     ];
 
-    const html = categorias.map(cat => {
+    // Solo se muestran las categorías que tienen contenido, y se agrega un
+    // filtro "Explorar ..." por cada una (además del "Ver todo").
+    const conItems = categorias.filter(cat => items.some(i => i.categoria === cat.clave));
+    if (conItems.length === 0) {
+        seccion.style.display = 'none';
+        return;
+    }
+
+    const filtros = `
+        <div class="recursos-filtros">
+            <button type="button" class="recursos-filtro-btn activo" data-filtro="todos">📂 Ver todo</button>
+            ${conItems.map(cat => `<button type="button" class="recursos-filtro-btn" data-filtro="${cat.clave}">${cat.boton}</button>`).join('')}
+        </div>
+    `;
+
+    const html = conItems.map(cat => {
         const catItems = items.filter(i => i.categoria === cat.clave);
-        if (catItems.length === 0) return '';
 
         const cuerpo = cat.clave === 'audio'
             ? audioPorAnioHtml(catItems)
-            : `<div class="recursos-grid">${tarjetasDeItems(catItems)}</div>`;
+            : `<div class="recursos-grid">${tarjetasDeItems(catItems, cat.clave)}</div>`;
 
         return `
-            <div class="recursos-categoria">
+            <div class="recursos-categoria" data-cat="${cat.clave}">
                 <h3>${cat.icono} ${cat.titulo}</h3>
                 ${cuerpo}
             </div>
         `;
     }).join('');
 
-    if (!html.trim()) {
-        seccion.style.display = 'none';
-        return;
-    }
-
-    contenedor.innerHTML = html;
+    contenedor.innerHTML = filtros + html;
     seccion.style.display = 'block';
 }
 
+// Botón de colaboración (si el admin configuró un enlace de donación)
+function botonDonar() {
+    if (!configDonar.url) return '';
+    return `<a href="${urlSegura(configDonar.url)}" target="_blank" rel="noopener noreferrer" class="recurso-button recurso-button-donar" title="Apoyar el proyecto">${escapeHtml(configDonar.texto || '🤝 Colaborar')}</a>`;
+}
+
 // Tarjeta genérica (cursos, libros, imágenes)
-function tarjetasDeItems(items) {
-    return items.map(item => `
+function tarjetasDeItems(items, categoria) {
+    const etiquetas = {
+        cursos: '📘 Ver curso',
+        libros: '📖 Leer documentación',
+        imagenes: '🖼️ Ver galería'
+    };
+    const etiqueta = etiquetas[categoria] || 'Abrir';
+
+    return items.map(item => {
+        const href = urlSegura(item.url);
+        return `
         <div class="recurso-card">
             <h4>${escapeHtml(item.titulo)}</h4>
             ${item.descripcion ? `<p>${escapeHtml(item.descripcion)}</p>` : ''}
-            <a href="${urlSegura(item.url)}" target="_blank" rel="noopener noreferrer" class="recurso-button">Abrir en Google Drive</a>
+            <div class="audio-actions">
+                ${botonDonar()}
+                ${href ? `<a href="${href}" target="_blank" rel="noopener noreferrer" class="recurso-button recurso-button-descarga">⬇️ ${etiqueta}</a>` : ''}
+            </div>
         </div>
-    `).join('');
+    `;
+    }).join('');
 }
 
 // Convierte cualquier enlace de Google Drive en la URL de streaming del
@@ -222,11 +258,53 @@ function tarjetasDeAudio(items) {
             <h4>${escapeHtml(item.titulo)}</h4>
             ${item.descripcion ? `<p>${escapeHtml(item.descripcion)}</p>` : ''}
             ${src ? `<audio controls preload="metadata" src="${src}"></audio>` : ''}
-            ${enlaceDescarga ? `<a href="${enlaceDescarga}" target="_blank" rel="noopener noreferrer" class="recurso-button">Descargar</a>` : ''}
+            <div class="audio-actions">
+                <button type="button" class="recurso-stop-btn" title="Detener reproducción">⏹ Detener</button>
+                ${botonDonar()}
+                ${enlaceDescarga ? `<a href="${enlaceDescarga}" target="_blank" rel="noopener noreferrer" class="recurso-button recurso-button-descarga">⬇️ Descargar</a>` : ''}
+            </div>
         </div>
     `;
     }).join('');
 }
+
+// Solo un audio a la vez: al reproducir uno, se pausan los demás.
+document.addEventListener('play', (e) => {
+    const target = e.target;
+    if (!target || target.tagName !== 'AUDIO') return;
+    const seccion = target.closest('#recursos');
+    if (!seccion) return;
+    seccion.querySelectorAll('audio').forEach(a => {
+        if (a !== target && !a.paused) a.pause();
+    });
+}, true);
+
+// Botón "Detener": pausa y vuelve al principio.
+document.addEventListener('click', (e) => {
+    const btn = e.target.closest('.recurso-stop-btn');
+    if (!btn) return;
+    const card = btn.closest('.recurso-card-audio');
+    const audio = card && card.querySelector('audio');
+    if (audio) {
+        audio.pause();
+        audio.currentTime = 0;
+    }
+});
+
+// Filtros "Explorar ..." de la sección Recursos (Ver todo / Música / etc.)
+document.addEventListener('click', (e) => {
+    const btn = e.target.closest('.recursos-filtro-btn');
+    if (!btn) return;
+    const seccion = document.getElementById('recursos');
+    if (!seccion) return;
+
+    seccion.querySelectorAll('.recursos-filtro-btn').forEach(b => b.classList.toggle('activo', b === btn));
+    const filtro = btn.dataset.filtro;
+    seccion.querySelectorAll('.recursos-categoria').forEach(bloque => {
+        const mostrar = filtro === 'todos' || bloque.dataset.cat === filtro;
+        bloque.style.display = mostrar ? '' : 'none';
+    });
+});
 
 // Agrupa los audios por año. El año va en el título (ej: "Zamba - 2020"),
 // así no hace falta cambiar la base de datos. Sin año quedan al final.
@@ -940,11 +1018,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Mostrar banner mientras Render despierta en la primera carga
     mostrarDespertando();
 
-    // Portada y botón de descarga configurados desde el panel admin
-    cargarConfiguracion();
+    // Portada, botón de descarga y configuración de colaboración
+    await cargarConfiguracion();
 
     // Recursos (solo se muestra si hay ítems cargados en el panel admin)
-    cargarRecursos();
+    await cargarRecursos();
 
     // Contar esta visita (una por sesión)
     contarVisita();

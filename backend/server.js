@@ -557,7 +557,9 @@ app.get('/api/config', async (req, res) => {
       data: {
         hero_background_url: config.hero_background_url || '',
         hero_boton_drive_url: config.hero_boton_drive_url || '',
-        hero_boton_drive_texto: config.hero_boton_drive_texto || '📘 Descargar Curso'
+        hero_boton_drive_texto: config.hero_boton_drive_texto || '📘 Descargar Curso',
+        donar_url: config.donar_url || '',
+        donar_texto: config.donar_texto || '🤝 Colaborar'
       }
     });
   } catch (error) {
@@ -568,7 +570,7 @@ app.get('/api/config', async (req, res) => {
 // PUT /api/config - Actualizar configuración (solo admin)
 app.put('/api/config', requireAdminKey, async (req, res) => {
   try {
-    const campos = ['hero_background_url', 'hero_boton_drive_url', 'hero_boton_drive_texto'];
+    const campos = ['hero_background_url', 'hero_boton_drive_url', 'hero_boton_drive_texto', 'donar_url', 'donar_texto'];
     const recibidos = Object.keys(req.body || {});
     const validos = recibidos.filter(c => campos.includes(c));
 

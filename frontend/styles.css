@@ -1168,6 +1168,67 @@ section:nth-child(even) {
     padding-left: var(--spacing-md);
 }
 
+/* Botones "Explorar" para filtrar la sección */
+.recursos-filtros {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-xl);
+}
+
+.recursos-filtro-btn {
+    background: #FEFBF7;
+    border: 2px solid var(--color-border);
+    border-radius: 24px;
+    padding: 0.5rem 1.1rem;
+    font-size: 0.9rem;
+    font-weight: bold;
+    color: var(--color-primary);
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.recursos-filtro-btn:hover {
+    border-color: var(--color-accent);
+}
+
+.recursos-filtro-btn.activo {
+    background: var(--color-secondary);
+    border-color: var(--color-secondary);
+    color: #17130E;
+}
+
+/* Acciones dentro de una tarjeta: detener, colaborar, descargar */
+.audio-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+    margin-top: auto;
+}
+
+.recurso-stop-btn {
+    background: transparent;
+    border: 2px solid var(--color-border);
+    border-radius: 20px;
+    padding: 0.55rem 1.1rem;
+    font-size: 0.9rem;
+    font-weight: bold;
+    color: var(--color-primary);
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.recurso-stop-btn:hover {
+    border-color: var(--color-accent);
+    background: #F5EFE6;
+}
+
+.recurso-button-donar {
+    background: var(--color-primary);
+    color: #FEFBF7;
+}
+
 .recursos-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
@@ -1241,10 +1302,6 @@ section:nth-child(even) {
     width: 100%;
     margin: var(--spacing-sm) 0;
     border-radius: 8px;
-}
-
-.recurso-card-audio .recurso-button {
-    margin-top: auto;
 }
 
 /* ============================================

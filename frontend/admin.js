@@ -1059,6 +1059,8 @@ async function cargarConfigAdmin() {
             document.getElementById('cfg-hero-url').value = cfg.hero_background_url || '';
             document.getElementById('cfg-drive-url').value = cfg.hero_boton_drive_url || '';
             document.getElementById('cfg-drive-texto').value = cfg.hero_boton_drive_texto || '📘 Descargar Curso';
+            document.getElementById('cfg-donar-url').value = cfg.donar_url || '';
+            document.getElementById('cfg-donar-texto').value = cfg.donar_texto || '🤝 Colaborar';
             actualizarPreviewPortada();
         }
     } catch (error) {
@@ -1072,7 +1074,9 @@ formConfig.addEventListener('submit', async (e) => {
     const body = {
         hero_background_url: document.getElementById('cfg-hero-url').value.trim(),
         hero_boton_drive_url: document.getElementById('cfg-drive-url').value.trim(),
-        hero_boton_drive_texto: document.getElementById('cfg-drive-texto').value.trim() || '📘 Descargar Curso'
+        hero_boton_drive_texto: document.getElementById('cfg-drive-texto').value.trim() || '📘 Descargar Curso',
+        donar_url: document.getElementById('cfg-donar-url').value.trim(),
+        donar_texto: document.getElementById('cfg-donar-texto').value.trim() || '🤝 Colaborar'
     };
 
     try {
