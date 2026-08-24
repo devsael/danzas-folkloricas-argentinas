@@ -826,14 +826,8 @@ async function eliminarCodigo(id) {
 }
 
 // ============================================
-// RECURSOS (material gratis del sitio)
+// RECURSOS (material gratis del sitio) — tabla con búsqueda, orden, paginación, inline edit
 // ============================================
-
-const formRecurso = document.getElementById('form-recurso');
-const recursoCancelBtn = document.getElementById('recurso-cancel-btn');
-const recursoFormTitle = document.getElementById('recurso-form-title');
-
-let recursosCache = [];
 
 const ETIQUETAS_CATEGORIA = {
     'cursos': '🎓 Cursos y Talleres',
@@ -842,8 +836,30 @@ const ETIQUETAS_CATEGORIA = {
     'imagenes': '🖼️ Galería de Imágenes'
 };
 
+let recursosCache = [];
+let recursosFiltrados = [];
+let recursosSort = { key: 'categoria', dir: 'asc' };
+let recursosPage = 1;
+const RECURSOS_POR_PAGINA = 20;
+
+const recursosCols = [
+    { key: 'categoria', label: 'Categoría', render: r => ETIQUETAS_CATEGORIA[r.categoria] || r.categoria },
+    { key: 'titulo', label: 'Título', render: r => escapeHtml(r.titulo) },
+    { key: 'descripcion', label: 'Descripción', render: r => r.descripcion ? escapeHtml(r.descripcion.substring(0, 100)) + (r.descripcion.length > 100 ? '…' : '') : '' },
+    { key: 'url', label: 'Enlace / Vista previa', render: r => renderUrlPreview(r.url, r.categoria) },
+    { key: 'acciones', label: 'Acciones', render: r => `
+        <button class="admin-action-btn btn-editar" onclick="iniciarEdicionInline(${r.id})" title="Editar">✏️</button>
+        <button class="admin-action-btn btn-ver" onclick="verVistaPrevia('${escapeHtml(r.url)}', '${escapeHtml(r.categoria)}')" title="Vista previa">👁️</button>
+        <button class="admin-action-btn btn-eliminar" onclick="eliminarRecurso(${r.id})" title="Eliminar">🗑️</button>
+    ` }
+];
+
 async function cargarRecursosAdmin() {
-    const lista = document.getElementById('recursos-admin-lista');
+    const tbody = document.getElementById('tabla-recursos-body');
+    if (!tbody) return;
+
+    tbody.innerHTML = '<tr><td colspan="5" class="loading">Cargando...</td></tr>';
+
     try {
         const response = await fetch(`${API_URL}/api/recursos`);
 
@@ -854,31 +870,231 @@ async function cargarRecursosAdmin() {
 
         const json = await response.json();
 
-        if (json.success && json.data.length > 0) {
-            recursosCache = json.data;
-            lista.innerHTML = json.data.map(r => `
-                <div class="admin-list-item">
-                    <div class="admin-list-content">
-                        <h4>${(ETIQUETAS_CATEGORIA[r.categoria] || r.categoria)} · ${escapeHtml(r.titulo)}</h4>
-                        <p>${r.descripcion ? escapeHtml(r.descripcion.substring(0, 120)) + (r.descripcion.length > 120 ? '...' : '') : ''}</p>
-                        <p style="font-size:0.8rem; color:#999;">🔗 ${escapeHtml(r.url)}</p>
-                    </div>
-                    <div class="admin-list-actions">
-                        <button class="admin-action-btn btn-editar" onclick="editarRecurso(${r.id})">Editar</button>
-                        <button class="admin-action-btn btn-eliminar" onclick="eliminarRecurso(${r.id})">Eliminar</button>
-                    </div>
-                </div>
-            `).join('');
+        if (json.success) {
+            recursosCache = json.data || [];
+            aplicarFiltroYOrden();
         } else {
-            recursosCache = [];
-            lista.innerHTML = '<p class="loading">Todavía no hay recursos cargados</p>';
+            throw new Error(json.error || 'Error al cargar');
         }
     } catch (error) {
         console.error(error);
-        lista.innerHTML = '<p class="loading">⚠️ No se pudo conectar con el servidor</p>';
+        document.getElementById('tabla-recursos-body').innerHTML = '<tr><td colspan="5" class="error">⚠️ No se pudo conectar con el servidor</td></tr>';
     }
 }
 
+function aplicarFiltroYOrden() {
+    const termino = document.getElementById('recursos-buscar')?.value?.toLowerCase().trim() || '';
+    recursosFiltrados = recursosCache.filter(r => {
+        if (!termino) return true;
+        return (
+            (r.titulo || '').toLowerCase().includes(termino) ||
+            (r.descripcion || '').toLowerCase().includes(termino) ||
+            (r.categoria || '').toLowerCase().includes(termino) ||
+            (r.url || '').toLowerCase().includes(termino)
+        );
+    });
+
+    recursosFiltrados.sort((a, b) => {
+        const aVal = a[recursosSort.key];
+        const bVal = b[recursosSort.key];
+        if (aVal === bVal) return 0;
+        const cmp = aVal > bVal ? 1 : -1;
+        return recursosSort.dir === 'asc' ? cmp : -cmp;
+    });
+
+    recursosPage = 1;
+    renderTablaRecursos();
+    actualizarFlechasOrden();
+}
+
+function renderTablaRecursos() {
+    const tbody = document.getElementById('tabla-recursos-body');
+    const inicio = (recursosPage - 1) * RECURSOS_POR_PAGINA;
+    const items = recursosFiltrados.slice(inicio, inicio + RECURSOS_POR_PAGINA);
+
+    if (items.length === 0) {
+        document.getElementById('tabla-recursos-body').innerHTML = '<tr><td colspan="5" class="empty">No hay recursos que coincidan</td></tr>';
+        document.getElementById('recursos-paginacion').innerHTML = '';
+        return;
+    }
+
+    document.getElementById('tabla-recursos-body').innerHTML = items.map(r => `
+        <tr data-id="${r.id}">
+            ${recursosCols.map(c => `<td>${c.render(r)}</td>`).join('')}
+        </tr>
+    `).join('');
+
+    renderPaginacionRecursos();
+}
+
+function renderPaginacionRecursos() {
+    const totalPaginas = Math.ceil(recursosFiltrados.length / RECURSOS_POR_PAGINA);
+    const pag = document.getElementById('recursos-paginacion');
+    if (totalPaginas <= 1) {
+        pag.innerHTML = '';
+        return;
+    }
+    let html = '';
+    if (recursosPage > 1) html += `<button onclick="cambiarPaginaRecursos(${recursosPage - 1})">« Anterior</button>`;
+    for (let p = 1; p <= totalPaginas; p++) {
+        if (p === 1 || p === totalPaginas || (p >= recursosPage - 1 && p <= recursosPage + 1)) {
+            html += `<button class="${p === recursosPage ? 'active' : ''}" onclick="cambiarPaginaRecursos(${p})">${p}</button>`;
+        } else if (p === recursosPage - 2 || p === recursosPage + 2) {
+            html += '<span>…</span>';
+        }
+    }
+    if (recursosPage < totalPaginas) html += `<button onclick="cambiarPaginaRecursos(${recursosPage + 1})">Siguiente »</button>`;
+    document.getElementById('recursos-paginacion').innerHTML = html;
+}
+
+function cambiarPaginaRecursos(p) {
+    recursosPage = p;
+    renderTablaRecursos();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function ordenarRecursos(key) {
+    if (recursosSort.key === key) {
+        recursosSort.dir = recursosSort.dir === 'asc' ? 'desc' : 'asc';
+    } else {
+        recursosSort.key = key;
+        recursosSort.dir = 'asc';
+    }
+    aplicarFiltroYOrden();
+}
+
+function actualizarFlechasOrden() {
+    document.querySelectorAll('#tabla-recursos th[data-sort]').forEach(th => {
+        const key = th.dataset.sort;
+        th.classList.remove('sort-asc', 'sort-desc');
+        if (key === recursosSort.key) th.classList.add(recursosSort.dir === 'asc' ? 'sort-asc' : 'sort-desc');
+    });
+}
+
+// --- Búsqueda ---
+document.addEventListener('input', e => {
+    if (e.target.id === 'recursos-buscar') {
+        clearTimeout(window._recursosBuscarTimer);
+        window._recursosBuscarTimer = setTimeout(aplicarFiltroYOrden, 200);
+    }
+});
+
+// --- Orden por cabecera ---
+document.addEventListener('click', e => {
+    const th = e.target.closest('#tabla-recursos th[data-sort]');
+    if (th) ordenarRecursos(th.dataset.sort);
+});
+
+// --- Vista previa de Drive ---
+function renderUrlPreview(url, categoria) {
+    if (!url) return '<span class="sin-url">—</span>';
+    const driveId = extraerDriveId(url);
+    if (!driveId) return `<a href="${escapeHtml(url)}" target="_blank" class="url-link">${escapeHtml(url.substring(0, 50))}…</a>`;
+
+    const iconos = { audio: '🎵', imagenes: '🖼️', cursos: '📘', libros: '📚', imagenes: '🖼️' };
+    const icono = iconos[categoria] || '🔗';
+    const thumb = `https://drive.google.com/thumbnail?id=${driveId}&sz=w200`;
+    return `
+        <div class="url-preview-cell">
+            <img src="${thumb}" alt="Vista previa" class="drive-thumb" loading="lazy">
+            <div class="url-info">
+                <span class="url-icon">${iconos[categoria] || '🔗'}</span>
+                <span class="url-text">Drive</span>
+            </div>
+        </div>
+    `;
+}
+
+function extraerDriveId(url) {
+    const m1 = url.match(/[?&]id=([^&]+)/);
+    const m2 = url.match(/\/d\/([^/]+)/);
+    return m1 ? m1[1] : (m2 ? m2[1] : null);
+}
+
+function verVistaPrevia(url, categoria) {
+    const driveId = extraerDriveId(url);
+    if (!driveId) { window.open(url, '_blank'); return; }
+
+    const thumb = `https://drive.google.com/thumbnail?id=${driveId}&sz=w800`;
+    const iconos = { audio: '🎵', imagenes: '🖼️', cursos: '📘', libros: '📚' };
+    const icono = iconos[categoria] || '🔗';
+
+    const modal = document.createElement('div');
+    modal.className = 'modal-preview';
+    modal.innerHTML = `
+        <div class="modal-preview-content">
+            <button class="modal-close" onclick="this.closest('.modal-preview').remove()">×</button>
+            <h4>Vista previa</h4>
+            ${categoria === 'audio' ? `
+                <audio controls src="${urlSegura(url)}" style="width:100%; max-width:400px;"></audio>
+            ` : `
+                <img src="https://drive.google.com/thumbnail?id=${extraerDriveId(url)}&sz=w1200" alt="Vista previa" style="max-width:100%; height:auto;">
+            `}
+            <p><a href="${urlSegura(url)}" target="_blank">Abrir en Drive ↗</a></p>
+        </div>
+    `;
+    document.body.appendChild(modal);
+    modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+}
+
+// --- Formulario slide-in (Nuevo / Editar) ---
+const formRecurso = document.getElementById('form-recurso');
+const recursoCancelBtn = document.getElementById('recurso-cancel-btn');
+const recursoFormTitle = document.getElementById('recurso-form-title');
+const formCard = document.getElementById('recurso-form-card');
+const btnNuevo = document.getElementById('btn-nuevo-recurso');
+const urlPreviewDiv = document.getElementById('r-url-preview');
+
+btnNuevo?.addEventListener('click', () => abrirFormularioRecurso());
+document.getElementById('recursos-buscar')?.addEventListener('input', () => {}); // listener ya está arriba
+
+function abrirFormularioRecurso(recurso = null) {
+    formRecurso.reset();
+    document.getElementById('r-id').value = '';
+    recursoFormTitle.textContent = recurso ? `Editar Recurso: ${recurso.titulo}` : '➕ Nuevo Recurso';
+    recursoCancelBtn.style.display = recurso ? 'inline-block' : 'none';
+    document.getElementById('recurso-status').textContent = '';
+
+    if (recurso) {
+        document.getElementById('r-id').value = recurso.id;
+        document.getElementById('r-categoria').value = recurso.categoria;
+        document.getElementById('r-titulo').value = recurso.titulo;
+        document.getElementById('r-descripcion').value = recurso.descripcion || '';
+        document.getElementById('r-url').value = recurso.url;
+    }
+    actualizarPreviewUrl();
+    formCard.style.display = 'block';
+    formCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+document.getElementById('r-url')?.addEventListener('input', actualizarPreviewUrl);
+document.getElementById('r-categoria')?.addEventListener('change', actualizarPreviewUrl);
+
+function actualizarPreviewUrl() {
+    const url = document.getElementById('r-url').value.trim();
+    const cat = document.getElementById('r-categoria').value;
+    const driveId = extraerDriveId(url);
+    if (!url || !driveId) {
+        urlPreviewDiv.style.display = 'none';
+        return;
+    }
+    const thumb = `https://drive.google.com/thumbnail?id=${driveId}&sz=w300`;
+    const iconos = { audio: '🎵', imagenes: '🖼️', cursos: '📘', libros: '📚' };
+    const icono = iconos[cat] || '🔗';
+    urlPreviewDiv.innerHTML = `
+        <strong>Vista previa:</strong>
+        ${cat === 'audio' ? `<audio controls src="${urlSegura(url)}" style="width:100%;"></audio>` : `<img src="https://drive.google.com/thumbnail?id=${driveId}&sz=w300" alt="Preview">`}
+        <span>${iconos[cat] || '🔗'} Drive ID: ${driveId}</span>
+    `;
+    urlPreviewDiv.style.display = 'block';
+}
+
+function iniciarEdicionInline(id) {
+    const r = recursosCache.find(x => x.id === id);
+    if (r) abrirFormularioRecurso(r);
+}
+
+// --- Submit formulario ---
 formRecurso.addEventListener('submit', async (e) => {
     e.preventDefault();
 
@@ -915,8 +1131,10 @@ formRecurso.addEventListener('submit', async (e) => {
             mostrarEstado('recurso-status', id ? '✓ Recurso actualizado' : '✓ Recurso guardado. Ya se ve en el sitio.', 'success');
             formRecurso.reset();
             document.getElementById('r-id').value = '';
-            recursoCancelBtn.style.display = 'none';
-            recursoFormTitle.textContent = 'Nuevo Recurso';
+            document.getElementById('recurso-cancel-btn').style.display = 'none';
+            document.getElementById('recurso-form-title').textContent = '➕ Nuevo Recurso';
+            document.getElementById('r-url-preview').style.display = 'none';
+            // No cerramos el formulario para permitir carga rápida de varios
             cargarRecursosAdmin();
         } else {
             mostrarEstado('recurso-status', `Error: ${json.error}`, 'error');
@@ -927,26 +1145,13 @@ formRecurso.addEventListener('submit', async (e) => {
     }
 });
 
-function editarRecurso(id) {
-    const r = recursosCache.find(x => x.id === id);
-    if (!r) return;
-
-    document.getElementById('r-id').value = r.id;
-    document.getElementById('r-categoria').value = r.categoria;
-    document.getElementById('r-titulo').value = r.titulo;
-    document.getElementById('r-descripcion').value = r.descripcion || '';
-    document.getElementById('r-url').value = r.url;
-
-    recursoFormTitle.textContent = `Editar Recurso: ${r.titulo}`;
-    recursoCancelBtn.style.display = 'inline-block';
-    recursoFormTitle.scrollIntoView({ behavior: 'smooth', block: 'start' });
-}
-
-recursoCancelBtn.addEventListener('click', () => {
-    formRecurso.reset();
+document.getElementById('recurso-cancel-btn')?.addEventListener('click', () => {
+    document.getElementById('form-recurso').reset();
     document.getElementById('r-id').value = '';
-    recursoCancelBtn.style.display = 'none';
-    recursoFormTitle.textContent = 'Nuevo Recurso';
+    document.getElementById('recurso-cancel-btn').style.display = 'none';
+    document.getElementById('recurso-form-title').textContent = '➕ Nuevo Recurso';
+    document.getElementById('r-url-preview').style.display = 'none';
+    document.getElementById('recurso-status').textContent = '';
 });
 
 async function eliminarRecurso(id) {

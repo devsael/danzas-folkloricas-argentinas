@@ -457,26 +457,36 @@
 
         <!-- PANEL: RECURSOS -->
         <div id="panel-recursos" class="admin-panel">
-            <div class="admin-form-card">
+            <div class="admin-toolbar">
+                <h3>📂 Recursos</h3>
+                <div class="toolbar-actions">
+                    <input type="text" id="recursos-buscar" class="search-input" placeholder="🔍 Buscar por título, categoría, descripción...">
+                    <button type="button" class="submit-button" id="btn-nuevo-recurso">➕ Nuevo Recurso</button>
+                </div>
+            </div>
+
+            <div class="admin-form-card" id="recurso-form-card" style="display:none;">
                 <h3 id="recurso-form-title">Nuevo Recurso</h3>
                 <p class="admin-hint" style="margin-bottom:1rem;">
                     Material gratis que se muestra en la sección "Recursos" del sitio: PDFs, libros, MP3 de música con su año en el título (ej: "Zamba - 2020"), galerías de fotos de peñas, enlaces a carpetas de Drive, etc.
                 </p>
                 <form id="form-recurso" class="form">
                     <input type="hidden" id="r-id" value="">
-                    <div class="form-group">
-                        <label for="r-categoria">Categoría *</label>
-                        <select id="r-categoria" required>
-                            <option value="cursos">🎓 Cursos y Talleres</option>
-                            <option value="libros">📚 Bibliografía y Libros</option>
-                            <option value="audio">🎵 Música y Grabaciones</option>
-                            <option value="imagenes">🖼️ Galería de Imágenes</option>
-                        </select>
-                        <p class="admin-hint">💡 Para música: poné el año en el título (ej: "Zamba - 2020") y usá el enlace directo de descarga de Drive.</p>
-                    </div>
-                    <div class="form-group">
-                        <label for="r-titulo">Título *</label>
-                        <input type="text" id="r-titulo" required maxlength="200" placeholder="Ej: Manual de Chacarera (PDF)">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="r-categoria">Categoría *</label>
+                            <select id="r-categoria" required>
+                                <option value="cursos">🎓 Cursos y Talleres</option>
+                                <option value="libros">📚 Bibliografía y Libros</option>
+                                <option value="audio">🎵 Música y Grabaciones</option>
+                                <option value="imagenes">🖼️ Galería de Imágenes</option>
+                            </select>
+                            <p class="admin-hint">💡 Para música: poné el año en el título (ej: "Zamba - 2020") y usá el enlace directo de descarga de Drive.</p>
+                        </div>
+                        <div class="form-group">
+                            <label for="r-titulo">Título *</label>
+                            <input type="text" id="r-titulo" required maxlength="200" placeholder="Ej: Manual de Chacarera (PDF)">
+                        </div>
                     </div>
                     <div class="form-group">
                         <label for="r-descripcion">Descripción</label>
@@ -487,15 +497,31 @@
                         <input type="text" id="r-url" required placeholder="https://drive.google.com/uc?export=download&id=...">
                         <p class="admin-hint">💡 Usá el enlace directo de descarga: https://drive.google.com/uc?export=download&id=ID</p>
                     </div>
-                    <button type="submit" class="submit-button" id="recurso-submit-btn">Guardar Recurso</button>
-                    <button type="button" class="submit-button" id="recurso-cancel-btn" style="display:none; background:#999; margin-left:0.5rem;">Cancelar edición</button>
+                    <div id="r-url-preview" class="url-preview" style="display:none;"></div>
+                    <div class="form-actions">
+                        <button type="submit" class="submit-button" id="recurso-submit-btn">Guardar Recurso</button>
+                        <button type="button" class="submit-button cancel-btn" id="recurso-cancel-btn" style="display:none;">Cancelar</button>
+                    </div>
                     <div id="recurso-status" class="form-status"></div>
                 </form>
             </div>
 
-            <h3 style="font-family: Georgia, serif; color: #8B6F47; margin-bottom: 1rem;">Recursos Cargados</h3>
-            <div id="recursos-admin-lista">
-                <p class="loading">Cargando...</p>
+            <div class="table-wrapper">
+                <table id="tabla-recursos" class="admin-table">
+                    <thead>
+                        <tr>
+                            <th data-sort="categoria">Categoría</th>
+                            <th data-sort="titulo">Título</th>
+                            <th data-sort="descripcion">Descripción</th>
+                            <th data-sort="url">Enlace / Vista previa</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabla-recursos-body">
+                        <tr><td colspan="5" class="loading">Cargando...</td></tr>
+                    </tbody>
+                </table>
+                <div id="recursos-paginacion" class="pagination"></div>
             </div>
         </div>
 

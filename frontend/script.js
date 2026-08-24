@@ -404,17 +404,108 @@ window.addEventListener('scroll', () => {
 });
 
 // ============================================
-// MANEJO DE MODALES
+// SEO: meta dinámicos + JSON-LD para modal de danza
 // ============================================
 
-const modal = document.getElementById('modal-danza');
-const closeBtn = document.querySelector('.close');
+// Guarda los meta originales al cargar para restaurarlos al cerrar el modal
+const metaOriginal = {
+  title: document.title,
+  description: document.querySelector('meta[name="description"]')?.getAttribute('content') || '',
+  ogTitle: document.querySelector('meta[property="og:title"]')?.getAttribute('content') || '',
+  ogDescription: document.querySelector('meta[property="og:description"]')?.getAttribute('content') || '',
+  ogImage: document.querySelector('meta[property="og:image"]')?.getAttribute('content') || '',
+  ogUrl: document.querySelector('meta[property="og:url"]')?.getAttribute('content') || '',
+  twitterCard: document.querySelector('meta[name="twitter:card"]')?.getAttribute('content') || '',
+  twitterTitle: document.querySelector('meta[name="twitter:title"]')?.getAttribute('content') || '',
+  twitterDescription: document.querySelector('meta[name="twitter:description"]')?.getAttribute('content') || '',
+  twitterImage: document.querySelector('meta[name="twitter:image"]')?.getAttribute('content') || '',
+  jsonLd: document.querySelector('script[type="application/ld+json"]')?.textContent || ''
+};
 
+function actualizarMeta(danza) {
+  const baseUrl = window.location.origin;
+  const url = `${baseUrl}/danza/${danza.id}`;
+  const img = urlSegura(urlImagenParaMostrar(danza.imagen_url)) || '';
+  const desc = (danza.historia || `Danza folklórica argentina: ${danza.nombre}. Región: ${danza.region}. Carácter: ${danza.caracter}.`).substring(0, 160);
+
+  // Helper para setear/crear meta
+  const setMeta = (selector, attr, value) => {
+    let el = document.querySelector(selector);
+    if (!el && value) {
+      el = document.createElement('meta');
+      if (selector.startsWith('meta[property')) el.setAttribute('property', selector.match(/\[property="([^"]+)"/)[1]);
+      else el.setAttribute('name', selector.match(/\[name="([^"]+)"/)[1]);
+      document.head.appendChild(el);
+    }
+    if (el) el.setAttribute('content', value || '');
+  };
+
+  // Title + meta básicos
+  document.title = `${danza.nombre} | Danzas Folklóricas Argentinas`;
+  setMeta('meta[name="description"]', 'content', desc);
+  setMeta('meta[property="og:title"]', 'content', danza.nombre);
+  setMeta('meta[property="og:description"]', 'content', desc);
+  setMeta('meta[property="og:image"]', 'content', img);
+  setMeta('meta[property="og:url"]', 'content', url);
+  setMeta('meta[property="og:type"]', 'content', 'music.song');
+  setMeta('meta[name="twitter:card"]', 'content', 'summary_large_image');
+  setMeta('meta[name="twitter:title"]', 'content', danza.nombre);
+  setMeta('meta[name="twitter:description"]', 'content', desc);
+  setMeta('meta[name="twitter:image"]', 'content', img);
+
+  // JSON-LD MusicRecording
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'MusicRecording',
+    name: danza.nombre,
+    description: desc,
+    image: img,
+    url: url,
+    byArtist: {
+      '@type': 'MusicGroup',
+      name: 'Danzas Folklóricas Argentinas'
+    },
+    genre: danza.caracter,
+    locationCreated: danza.region,
+    inLanguage: 'es-AR'
+  };
+  // Reemplaza/crea el script JSON-LD
+  let ld = document.querySelector('script[type="application/ld+json"]');
+  if (!ld) {
+    ld = document.createElement('script');
+    ld.type = 'application/ld+json';
+    document.head.appendChild(ld);
+  }
+  ld.textContent = JSON.stringify(jsonLd);
+}
+
+function restaurarMetaOriginal() {
+  document.title = metaOriginal.title;
+  const setMeta = (selector, value) => {
+    const el = document.querySelector(selector);
+    if (el) el.setAttribute('content', value || '');
+  };
+  setMeta('meta[name="description"]', metaOriginal.description);
+  setMeta('meta[property="og:title"]', metaOriginal.ogTitle);
+  setMeta('meta[property="og:description"]', metaOriginal.ogDescription);
+  setMeta('meta[property="og:image"]', metaOriginal.ogImage);
+  setMeta('meta[property="og:url"]', metaOriginal.ogUrl);
+  setMeta('meta[name="twitter:card"]', metaOriginal.twitterCard);
+  setMeta('meta[name="twitter:title"]', metaOriginal.twitterTitle);
+  setMeta('meta[name="twitter:description"]', metaOriginal.twitterDescription);
+  setMeta('meta[name="twitter:image"]', metaOriginal.twitterImage);
+  // JSON-LD original
+  let ld = document.querySelector('script[type="application/ld+json"]');
+  if (ld) ld.textContent = metaOriginal.jsonLd;
+}
+ 
 function cerrarModal() {
     modal.classList.remove('show');
     document.body.classList.remove('modal-abierto');
+    history.pushState(null, '', '/');
+    restaurarMetaOriginal();
 }
-
+ 
 closeBtn.addEventListener('click', cerrarModal);
 
 window.addEventListener('click', (event) => {
@@ -465,6 +556,8 @@ function abrirModalDanza(id) {
 
     modal.classList.add('show');
     document.body.classList.add('modal-abierto');
+    history.pushState(null, '', `/danza/${danza.id}`);
+    actualizarMeta(danza);
 }
 
 // ============================================
