@@ -499,6 +499,10 @@ function restaurarMetaOriginal() {
   if (ld) ld.textContent = metaOriginal.jsonLd;
 }
  
+// Elementos del modal
+const modal = document.getElementById('modal-danza');
+const closeBtn = document.querySelector('.close');
+ 
 function cerrarModal() {
     modal.classList.remove('show');
     document.body.classList.remove('modal-abierto');
