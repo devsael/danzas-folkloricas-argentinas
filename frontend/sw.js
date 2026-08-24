@@ -1,15 +1,18 @@
 // Service Worker para Danzas Folklóricas Argentinas
-// Maneja el routing SPA en GitHub Pages interceptando navegaciones
-// y sirviendo index.html para todas las rutas de la aplicación.
+// Maneja el routing SPA en GitHub Pages interceptando TODAS las navegaciones
+// y sirviendo index.html para cualquier ruta que no sea un asset estático.
 
-const CACHE_NAME = 'danzas-folkloricas-v1';
+const CACHE_NAME = 'danzas-folkloricas-v2';
+const BASE_PATH = '/danzas-folkloricas-argentinas';
 const STATIC_ASSETS = [
-    '/',
-    '/index.html',
-    '/script.js',
-    '/styles.css',
-    '/danzas-cache.js',
-    '/favicon.svg',
+    BASE_PATH + '/',
+    BASE_PATH + '/index.html',
+    BASE_PATH + '/script.js',
+    BASE_PATH + '/styles.css',
+    BASE_PATH + '/danzas-cache.js',
+    BASE_PATH + '/favicon.svg',
+    BASE_PATH + '/sw.js',
+    BASE_PATH + '/404.html',
 ];
 
 // Instalación: cachear assets estáticos
@@ -19,9 +22,9 @@ self.addEventListener('install', (event) => {
             .then((cache) => cache.addAll(STATIC_ASSETS))
             .then(() => self.skipWaiting())
     );
-});
+}
 
-// Activación: limpiar caches antiguos
+// Activación: limpiar caches antiguos y tomar control inmediato
 self.addEventListener('activate', (event) => {
     event.waitUntil(
         caches.keys().then((cacheNames) => {
@@ -32,10 +35,25 @@ self.addEventListener('activate', (event) => {
             );
         }).then(() => self.clients.claim())
     );
-});
+}
 
-// Interceptar peticiones: estrategia "Network First, fallback to Cache"
-// Para navegaciones (HTML), servir index.html si no está en cache
+// Helper: determinar si es una navegación (HTML)
+function isNavigation(request) {
+    const acceptHeader = request.headers.get('accept') || '';
+    return acceptHeader.includes('text/html');
+}
+
+// Helper: determinar si es un asset estático
+function isStaticAsset(pathname) {
+    return /\.(css|js|svg|png|jpg|jpeg|gif|webp|ico|woff|woff2|json|xml|txt|map)$/i.test(pathname);
+}
+
+// Helper: determinar si es una ruta de la app (no asset, no API)
+function isAppRoute(pathname) {
+    return !isStaticAsset(pathname) && !pathname.startsWith('/api/');
+}
+
+// Interceptar TODAS las peticiones
 self.addEventListener('fetch', (event) => {
     const { request } = event;
     const url = new URL(request.url);
@@ -52,16 +70,23 @@ self.addEventListener('fetch', (event) => {
 
     const pathname = url.pathname;
 
-    // Ignorar assets estáticos (los deja pasar normalmente)
-    if (/\.(css|js|svg|png|jpg|jpeg|gif|webp|ico|woff|woff2|json|xml|txt|map)$/i.test(pathname)) {
+    // Ignorar assets estáticos (los deja pasar normalmente al navegador)
+    if (isStaticAsset(pathname)) {
         return;
     }
 
-    // Para navegaciones (HTML), usar estrategia "Network First, fallback to index.html"
-    const acceptHeader = request.headers.get('accept') || '';
-    const isNavigation = acceptHeader.includes('text/html');
+    // Ignorar peticiones a la API
+    if (pathname.startsWith('/api/')) {
+        return;
+    }
 
-    if (isNavigation) {
+    // Para TODAS las navegaciones (HTML), usar estrategia:
+    // 1. Intentar red
+    // 2. Si falla (404, offline, etc.), servir index.html desde cache
+    const acceptHeader = request.headers.get('accept') || '';
+    const isNavigationRequest = acceptHeader.includes('text/html');
+
+    if (isNavigationRequest) {
         event.respondWith(
             (async () => {
                 try {
@@ -70,21 +95,32 @@ self.addEventListener('fetch', (event) => {
                     if (networkResponse.ok) {
                         return networkResponse;
                     }
-                    // Si la red falla (404, etc.), servir index.html desde cache
+                    // Si la red falla (404, offline, etc.), servir index.html desde cache
                     const cache = await caches.open(CACHE_NAME);
-                    const cachedResponse = await cache.match('/index.html');
-                    return cachedResponse || new Response('Offline', { status: 503 });
+                    const cachedResponse = await cache.match(BASE_PATH + '/index.html');
+                    if (cachedResponse) {
+                        return cachedResponse;
+                    }
+                    // Fallback: intentar fetch index.html
+                    const indexResponse = await fetch(BASE_PATH + '/index.html');
+                    if (indexResponse.ok) {
+                        const cache = await caches.open(CACHE_NAME);
+                        cache.put(BASE_PATH + '/index.html', indexResponse.clone());
+                        return indexResponse;
+                    }
+                    return new Response('Offline', { status: 503 });
                 } catch (error) {
-                    // Si todo falla, servir index.html desde cache
                     const cache = await caches.open(CACHE_NAME);
-                    return cache.match('/index.html') || new Response('Offline', { status: 503 });
+                    const cachedResponse = await cache.match(BASE_PATH + '/index.html');
+                    return cachedResponse || new Response('Offline', { status: 503 });
                 }
             })()
         );
         return;
     }
 
-    // Para otros recursos (API, etc.), usar estrategia "Cache First, fallback to Network"
+    // Para otros recursos (no navegación, no API, no assets estáticos),
+    // usar estrategia "Cache First, fallback to Network"
     event.respondWith(
         (async () => {
             const cache = await caches.open(CACHE_NAME);
@@ -103,9 +139,10 @@ self.addEventListener('fetch', (event) => {
             }
         })()
     );
+    return;
 });
 
-// Manejar mensajes del cliente (para skipWaiting, etc.)
+// Manejar mensajes del cliente
 self.addEventListener('message', (event) => {
     if (event.data === 'skipWaiting') {
         self.skipWaiting();
