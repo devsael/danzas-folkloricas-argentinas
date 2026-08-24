@@ -50,12 +50,20 @@ function renderBotonDrive(url, texto) {
     link.style.display = 'inline-block';
 }
 
-// Renderiza el botón de colaboración en el hero
+// Renderiza el botón de colaboración en el hero (botón oficial Cafecito)
 function renderBotonColaborar(url, texto) {
     const link = document.getElementById('hero-colaborar-link');
     if (!link || !url) return;
     link.href = url;
-    link.textContent = texto || '☕ Invitar un cafecito';
+    link.innerHTML = `
+        <img 
+            srcset="https://cdn.cafecito.app/imgs/buttons/button_5.png 1x, 
+                    https://cdn.cafecito.app/imgs/buttons/button_5_2x.png 2x, 
+                    https://cdn.cafecito.app/imgs/buttons/button_5_3.75x.png 3.75x" 
+            src="https://cdn.cafecito.app/imgs/buttons/button_5.png" 
+            alt="${texto || 'Invitame un café en cafecito.app'}" 
+            style="height: 44px; width: auto;">
+    `;
     link.style.display = 'inline-block';
 }
 
@@ -235,10 +243,20 @@ async function cargarRecursos() {
 
 // Botón de colaboración (si el admin configuró un enlace de donación).
 // Se valida la URL: si no es http/https segura, no se muestra nada.
+// Versión chica para tarjetas de recursos (imagen oficial Cafecito 28px alto)
 function botonDonar() {
     const href = urlSegura(configDonar.url);
     if (!href) return '';
-    return `<a href="${href}" target="_blank" rel="noopener noreferrer" class="recurso-button recurso-button-donar" title="Apoyar el proyecto">${escapeHtml(configDonar.texto || '🤝 Colaborar')}</a>`;
+    return `
+        <a href="${href}" target="_blank" rel="noopener noreferrer" class="recurso-button recurso-button-donar" title="Apoyar el proyecto">
+            <img 
+                srcset="https://cdn.cafecito.app/imgs/buttons/button_5.png 1x, 
+                        https://cdn.cafecito.app/imgs/buttons/button_5_2x.png 2x" 
+                src="https://cdn.cafecito.app/imgs/buttons/button_5.png" 
+                alt="${escapeHtml(configDonar.texto || 'Invitame un café en cafecito.app')}" 
+                style="height: 28px; width: auto; vertical-align: middle; margin-right: 4px;">
+        </a>
+    `;
 }
 
 // Tarjeta genérica (cursos, libros, imágenes)
