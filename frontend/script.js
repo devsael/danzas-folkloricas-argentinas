@@ -313,7 +313,7 @@ function tarjetasDeAudio(items) {
             ${item.descripcion ? `<p>${escapeHtml(item.descripcion)}</p>` : ''}
             ${src ? `<audio controls preload="metadata" src="${src}"></audio>` : ''}
             <div class="audio-actions">
-                <button type="button" class="recurso-stop-btn" title="Detener reproducción">⏹ Detener</button>
+                <button type="button" class="recurso-stop-btn" title="Detener/Reproducir" data-playing="false">⏹ Detener</button>
                 ${botonDonar()}
                 ${enlaceDescarga ? `<a href="${enlaceDescarga}" target="_blank" rel="noopener noreferrer" class="recurso-button recurso-button-descarga">⬇️ Descargar</a>` : ''}
             </div>
@@ -333,15 +333,25 @@ document.addEventListener('play', (e) => {
     });
 }, true);
 
-// Botón "Detener": pausa y vuelve al principio.
+// Botón "Detener/Reproducir": toggle play/pause
 document.addEventListener('click', (e) => {
     const btn = e.target.closest('.recurso-stop-btn');
     if (!btn) return;
     const card = btn.closest('.recurso-card-audio');
     const audio = card && card.querySelector('audio');
     if (audio) {
-        audio.pause();
-        audio.currentTime = 0;
+        const isPlaying = btn.dataset.playing === 'true';
+        if (isPlaying) {
+            audio.pause();
+            btn.dataset.playing = 'false';
+            btn.textContent = '▶️ Reproducir';
+            btn.title = 'Reproducir';
+        } else {
+            audio.play();
+            btn.dataset.playing = 'true';
+            btn.textContent = '⏸️ Pausar';
+            btn.title = 'Pausar';
+        }
     }
 });
 
