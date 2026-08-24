@@ -227,13 +227,15 @@ function tarjetasDeItems(items, categoria) {
 
     return items.map(item => {
         const href = urlSegura(item.url);
+        const esDrive = item.url && (item.url.includes('drive.google.com') || item.url.includes('docs.google.com'));
+        const hrefDescarga = (esDrive && item.id) ? urlDescargaProxy(item.id) : href;
         return `
         <div class="recurso-card">
             <h4>${escapeHtml(item.titulo)}</h4>
             ${item.descripcion ? `<p>${escapeHtml(item.descripcion)}</p>` : ''}
             <div class="audio-actions">
                 ${botonDonar()}
-                ${href ? `<a href="${href}" target="_blank" rel="noopener noreferrer" class="recurso-button recurso-button-descarga">⬇️ ${etiqueta}</a>` : ''}
+                ${hrefDescarga ? `<a href="${hrefDescarga}" target="_blank" rel="noopener noreferrer" class="recurso-button recurso-button-descarga">⬇️ ${etiqueta}</a>` : ''}
             </div>
         </div>
     `;
@@ -250,11 +252,18 @@ function urlAudioStreaming(url) {
     return urlSegura(url);
 }
 
+// Genera la URL del proxy de descarga del backend para un recurso
+function urlDescargaProxy(id) {
+    return `${API_URL}/api/recursos/${id}/download`;
+}
+
 // Tarjeta de audio con reproductor embebido (memoriza la posición al expandir/colapsar)
 function tarjetasDeAudio(items) {
     return items.map(item => {
         const src = urlAudioStreaming(item.url);
-        const enlaceDescarga = urlSegura(item.url);
+        const enlaceDescarga = (item.url && item.url.includes('drive.google.com') && item.id)
+            ? urlDescargaProxy(item.id)
+            : urlSegura(item.url);
         return `
         <div class="recurso-card recurso-card-audio">
             <h4>${escapeHtml(item.titulo)}</h4>

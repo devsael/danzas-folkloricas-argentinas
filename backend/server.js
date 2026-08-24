@@ -634,6 +634,79 @@ app.post('/api/recursos', requireAdminKey, async (req, res) => {
   }
 });
 
+// Helper: extrae el fileId de cualquier URL de Drive
+function extraerDriveId(url) {
+  const m1 = url.match(/[?&]id=([^&]+)/);
+  const m2 = url.match(/\/d\/([^/]+)/);
+  return m1 ? m1[1] : (m2 ? m2[1] : null);
+}
+
+// Helper: sanitiza nombre de archivo para Content-Disposition
+function sanitizeFilename(nombre) {
+  return String(nombre || 'archivo')
+    .replace(/[^\w\s\-\.\(\)]/g, '_')
+    .replace(/\s+/g, '_')
+    .substring(0, 120);
+}
+
+// GET /api/recursos/:id/download — Descarga proxy desde Drive (DEBE IR ANTES DE PUT/DELETE)
+app.get('/api/recursos/:id/download', rateLimit(20, 60000), async (req, res) => {
+  const id = Number(req.params.id);
+  if (!id) return res.status(400).json({ success: false, error: 'ID inválido' });
+
+  try {
+    const recurso = await db.get('SELECT * FROM recursos WHERE id = ?', [id]);
+    if (!recurso) return res.status(404).json({ success: false, error: 'Recurso no encontrado' });
+
+    const driveId = extraerDriveId(recurso.url);
+    if (!driveId) {
+      return res.status(400).json({ success: false, error: 'El recurso no tiene un enlace de Google Drive válido' });
+    }
+
+    // Nombre de archivo sugerido: título + extensión según categoría
+    const ext = { audio: 'mp3', imagenes: 'jpg', cursos: 'pdf', libros: 'pdf' }[recurso.categoria] || 'bin';
+    const nombreArchivo = sanitizeFilename(`${recurso.titulo}.${ext}`);
+
+    const descargar = async (confirmToken) => {
+      const url = `https://drive.google.com/uc?export=download&id=${driveId}${confirmToken ? `&confirm=${confirmToken}` : ''}`;
+      return fetch(url, {
+        redirect: 'follow',
+        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36' }
+      });
+    };
+
+    let upstream = await descargar();
+
+    if (!upstream.ok) {
+      return res.status(502).json({ success: false, error: `Drive respondió ${upstream.status}` });
+    }
+
+    const contentType = upstream.headers.get('content-type') || '';
+
+    // Si Drive devuelve la página de escaneo de virus (archivos grandes),
+    // se extrae el token de confirmación y se reintenta una vez.
+    if (contentType.includes('text/html')) {
+      const html = await upstream.text();
+      const match = html.match(/name="confirm" value="([^"]+)"/);
+      if (!match) {
+        return res.status(502).json({ success: false, error: 'Drive pidió confirmación manual (archivo muy grande)' });
+      }
+      upstream = await descargar(match[1]);
+    }
+
+    // Determinar content-type según categoría
+    const ctMap = { audio: 'audio/mpeg', imagenes: 'image/jpeg', cursos: 'application/pdf', libros: 'application/pdf' };
+    const ct = ctMap[recurso.categoria] || 'application/octet-stream';
+
+    res.setHeader('Content-Type', ct);
+    res.setHeader('Content-Disposition', `attachment; filename="${sanitizeFilename(`${recurso.titulo}.${ext}`)}"`);
+    res.setHeader('Cache-Control', 'private, max-age=3600');
+    res.send(Buffer.from(await upstream.arrayBuffer()));
+  } catch (error) {
+    return handleError(res, error, req);
+  }
+});
+
 // PUT /api/recursos/:id - Editar un recurso (solo admin)
 app.put('/api/recursos/:id', requireAdminKey, validarId, async (req, res) => {
   try {
