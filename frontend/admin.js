@@ -849,7 +849,7 @@ const recursosCols = [
     { key: 'url', label: 'Enlace / Vista previa', render: r => renderUrlPreview(r.url, r.categoria) },
     { key: 'acciones', label: 'Acciones', render: r => `
         <button class="admin-action-btn btn-editar" onclick="iniciarEdicionInline(${r.id})" title="Editar">✏️</button>
-        <button class="admin-action-btn btn-ver" onclick="verVistaPrevia('${escapeHtml(r.url)}', '${escapeHtml(r.categoria)}')" title="Vista previa">👁️</button>
+        <button class="admin-action-btn btn-ver" onclick="verVistaPrevia(${r.id}, '${escapeHtml(r.url)}', '${escapeHtml(r.categoria)}')" title="Vista previa">👁️</button>
         <button class="admin-action-btn btn-eliminar" onclick="eliminarRecurso(${r.id})" title="Eliminar">🗑️</button>
     ` }
 ];
@@ -991,7 +991,7 @@ function renderUrlPreview(url, categoria) {
     const driveId = extraerDriveId(url);
     if (!driveId) return `<a href="${escapeHtml(url)}" target="_blank" class="url-link">${escapeHtml(url.substring(0, 50))}…</a>`;
 
-    const iconos = { audio: '🎵', imagenes: '🖼️', cursos: '📘', libros: '📚', imagenes: '🖼️' };
+    const iconos = { audio: '🎵', imagenes: '🖼️', cursos: '📘', libros: '📚' };
     const icono = iconos[categoria] || '🔗';
     const thumb = `https://drive.google.com/thumbnail?id=${driveId}&sz=w200`;
     return `
@@ -1011,13 +1011,18 @@ function extraerDriveId(url) {
     return m1 ? m1[1] : (m2 ? m2[1] : null);
 }
 
-function verVistaPrevia(url, categoria) {
+function verVistaPrevia(id, url, categoria) {
     const driveId = extraerDriveId(url);
     if (!driveId) { window.open(url, '_blank'); return; }
 
     const thumb = `https://drive.google.com/thumbnail?id=${driveId}&sz=w800`;
     const iconos = { audio: '🎵', imagenes: '🖼️', cursos: '📘', libros: '📚' };
     const icono = iconos[categoria] || '🔗';
+
+    // Para audio, usar el proxy de descarga; para otros, usar la URL directa
+    const audioSrc = (categoria === 'audio' && id) 
+        ? `${API_URL}/api/recursos/${id}/download`
+        : urlSegura(url);
 
     const modal = document.createElement('div');
     modal.className = 'modal-preview';
@@ -1026,7 +1031,7 @@ function verVistaPrevia(url, categoria) {
             <button class="modal-close" onclick="this.closest('.modal-preview').remove()">×</button>
             <h4>Vista previa</h4>
             ${categoria === 'audio' ? `
-                <audio controls src="${urlSegura(url)}" style="width:100%; max-width:400px;"></audio>
+                <audio controls src="${audioSrc}" style="width:100%; max-width:400px;"></audio>
             ` : `
                 <img src="https://drive.google.com/thumbnail?id=${extraerDriveId(url)}&sz=w1200" alt="Vista previa" style="max-width:100%; height:auto;">
             `}
@@ -1046,9 +1051,8 @@ const btnNuevo = document.getElementById('btn-nuevo-recurso');
 const urlPreviewDiv = document.getElementById('r-url-preview');
 
 btnNuevo?.addEventListener('click', () => abrirFormularioRecurso());
-document.getElementById('recursos-buscar')?.addEventListener('input', () => {}); // listener ya está arriba
 
-function abrirFormularioRecurso(recurso = null) {
+    function abrirFormularioRecurso(recurso = null) {
     formRecurso.reset();
     document.getElementById('r-id').value = '';
     recursoFormTitle.textContent = recurso ? `Editar Recurso: ${recurso.titulo}` : '➕ Nuevo Recurso';
