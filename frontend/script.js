@@ -594,7 +594,6 @@ function abrirModalDanza(id) {
 
     modal.classList.add('show');
     document.body.classList.add('modal-abierto');
-    history.pushState(null, '', `/danza/${danza.id}`);
     actualizarMeta(danza);
 }
 
@@ -1132,6 +1131,20 @@ function mostrarErrorConexion() {
 }
 
 // ============================================
+// SERVICE WORKER REGISTRATION
+// ============================================
+
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js')
+        .then((registration) => {
+            console.log('Service Worker registrado:', registration.scope);
+        })
+        .catch((error) => {
+            console.warn('Service Worker registration failed:', error);
+        });
+}
+
+// ============================================
 // INICIALIZACIÓN
 // ============================================
 
@@ -1144,17 +1157,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // página quedaba donde estabas, por ejemplo en el libro de visitas).
     if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
 
-    // SPA fallback para GitHub Pages: si venimos de 404.html con hash (#/danza/123),
-    // parseamos el hash y abrimos el modal correspondiente.
-    if (location.hash.startsWith('#/danza/')) {
-        const id = parseInt(location.hash.slice('#/danza/'.length), 10);
-        if (!isNaN(id)) {
-            // Esperar a que carguen los datos y luego abrir el modal
-            setTimeout(() => abrirModalDanza(id), 100);
-        }
-        // Limpiar el hash para que no quede en la URL
-        history.replaceState(null, '', '/');
-    }
+    
 
     if (!location.hash) window.scrollTo(0, 0);
 
