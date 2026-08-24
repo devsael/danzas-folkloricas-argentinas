@@ -4,23 +4,26 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="robots" content="noindex">
-    <!-- cache-bust: 2025-08-24-3 -->
+    <!-- cache-bust: 2025-08-24-4 -->
     <title>Redirigiendo...</title>
     <script>
-        // SPA fallback para GitHub Pages: redirige INMEDIATAMENTE al hash
-        // para que el router del lado del cliente (pushState) pueda manejarla.
+        // SPA fallback para GitHub Pages PROJECT PAGE: redirige INMEDIATAMENTE al hash
+        // preservando el base path del project page (/danzas-folkloricas-argentinas/)
         (function() {
             var path = window.location.pathname;
+            var basePath = '/danzas-folkloricas-argentinas';
             // Evita redirigir assets (css, js, imágenes, etc.)
             if (/\.(css|js|svg|png|jpg|jpeg|gif|webp|ico|woff|woff2|json|xml|txt)$/i.test(path)) {
                 return;
             }
-            // Redirige INMEDIATAMENTE al hash para que el router SPA la maneje.
-            var redirectUrl = '/' + path.slice(1).replace(/\/$/, '') + (window.location.search || '');
-            window.location.replace('/#' + redirectUrl);
+            // Extraer la ruta relativa al base path
+            var relativePath = path.startsWith(basePath) ? path.slice(basePath.length) : path;
+            // Redirige INMEDIATAMENTE al hash preservando el base path
+            var redirectUrl = basePath + '/#' + relativePath.slice(1).replace(/\/$/, '') + (window.location.search || '');
+            window.location.replace(redirectUrl);
         })();
     </script>
-    <meta http-equiv="refresh" content="0;url=/">
+    <meta http-equiv="refresh" content="0;url=/danzas-folkloricas-argentinas/">
     <title>Redirigiendo...</title>
 </head>
 <body>
@@ -28,8 +31,10 @@
         // Fallback inmediato por si el script del head no corrió
         (function() {
             var path = window.location.pathname;
+            var basePath = '/danzas-folkloricas-argentinas';
             if (!/\.(css|js|svg|png|jpg|jpeg|gif|webp|ico|woff|woff2|json|xml|txt)$/i.test(path)) {
-                window.location.replace('/#' + window.location.pathname.slice(1) + (window.location.search || ''));
+                var relativePath = path.startsWith(basePath) ? path.slice(basePath.length) : path;
+                window.location.replace(basePath + '/#' + relativePath.slice(1) + (window.location.search || ''));
             }
         })();
     </script>
