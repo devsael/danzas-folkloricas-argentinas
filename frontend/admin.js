@@ -1094,6 +1094,9 @@ function iniciarEdicionInline(id) {
     if (r) abrirFormularioRecurso(r);
 }
 
+// Exponer globalmente para que onclick inline funcione
+window.iniciarEdicionInline = iniciarEdicionInline;
+
 // --- Submit formulario ---
 formRecurso.addEventListener('submit', async (e) => {
     e.preventDefault();
