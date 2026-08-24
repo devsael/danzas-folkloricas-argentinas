@@ -262,6 +262,30 @@ body.modal-abierto {
     box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
 }
 
+.cta-colaborar {
+    background: linear-gradient(135deg, #C1410C 0%, #8B6F47 100%);
+    color: #FEFBF7;
+    border: none;
+    padding: var(--spacing-md) var(--spacing-xl);
+    font-size: 1.1rem;
+    border-radius: 50px;
+    cursor: pointer;
+    transition: var(--transition);
+    font-weight: bold;
+    box-shadow: 0 4px 15px rgba(139, 111, 71, 0.4);
+    font-family: var(--font-secondary);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    text-decoration: none;
+}
+
+.cta-colaborar:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(139, 111, 71, 0.5);
+}
+
 .plan-contacto {
     text-align: center;
     margin-top: var(--spacing-xl);
@@ -1196,6 +1220,20 @@ section:nth-child(even) {
     background: var(--color-secondary);
     border-color: var(--color-secondary);
     color: #17130E;
+}
+
+.recursos-filtro-btn:disabled,
+.recursos-filtro-btn.deshabilitado {
+    opacity: 0.4;
+    cursor: not-allowed;
+    border-color: var(--color-border);
+    color: var(--color-text-light);
+}
+
+.recursos-filtro-btn:disabled:hover,
+.recursos-filtro-btn.deshabilitado:hover {
+    border-color: var(--color-border);
+    background: #FEFBF7;
 }
 
 /* Acciones dentro de una tarjeta: detener, colaborar, descargar */

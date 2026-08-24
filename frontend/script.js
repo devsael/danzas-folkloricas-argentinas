@@ -50,6 +50,15 @@ function renderBotonDrive(url, texto) {
     link.style.display = 'inline-block';
 }
 
+// Renderiza el botón de colaboración en el hero
+function renderBotonColaborar(url, texto) {
+    const link = document.getElementById('hero-colaborar-link');
+    if (!link || !url) return;
+    link.href = url;
+    link.textContent = texto || '☕ Invitar un cafecito';
+    link.style.display = 'inline-block';
+}
+
 // Config de colaboración ("Colaborar") para la sección Recursos.
 // Se carga junto con la configuración del panel admin.
 let configDonar = { url: '', texto: '🤝 Colaborar' };
@@ -62,6 +71,7 @@ async function cargarConfiguracion() {
         const cfg = json.data || {};
         aplicarPortada(cfg.hero_background_url);
         renderBotonDrive(cfg.hero_boton_drive_url, cfg.hero_boton_drive_texto);
+        renderBotonColaborar(cfg.donar_url, cfg.donar_texto);
         configDonar = {
             url: cfg.donar_url || '',
             texto: cfg.donar_texto || '🤝 Colaborar'
@@ -174,35 +184,50 @@ async function cargarRecursos() {
         { clave: 'imagenes', titulo: 'Galería de Imágenes', icono: '🖼️', boton: '🖼️ Explorar imágenes' }
     ];
 
-    // Solo se muestran las categorías que tienen contenido, y se agrega un
-    // filtro "Explorar ..." por cada una (además del "Ver todo").
-    const conItems = categorias.filter(cat => items.some(i => i.categoria === cat.clave));
-    if (conItems.length === 0) {
+    // Verificar qué categorías tienen items
+    const categoriasConItems = {};
+    categorias.forEach(cat => {
+        categoriasConItems[cat.clave] = items.some(i => i.categoria === cat.clave);
+    });
+
+    // Si no hay ningún item en ninguna categoría, ocultar sección
+    if (!Object.values(categoriasConItems).some(v => v)) {
         seccion.style.display = 'none';
         return;
     }
 
+    // Filtros: SIEMPRE mostramos todos los botones, deshabilitando los vacíos
     const filtros = `
         <div class="recursos-filtros">
             <button type="button" class="recursos-filtro-btn activo" data-filtro="todos">📂 Ver todo</button>
-            ${conItems.map(cat => `<button type="button" class="recursos-filtro-btn" data-filtro="${cat.clave}">${cat.boton}</button>`).join('')}
+            ${categorias.map(cat => `
+                <button type="button" 
+                    class="recursos-filtro-btn${categoriasConItems[cat.clave] ? '' : ' deshabilitado'}" 
+                    data-filtro="${cat.clave}"
+                    ${categoriasConItems[cat.clave] ? '' : 'disabled'}>
+                    ${cat.boton}
+                </button>
+            `).join('')}
         </div>
     `;
 
-    const html = conItems.map(cat => {
-        const catItems = items.filter(i => i.categoria === cat.clave);
+    // Renderizar solo categorías que tienen items
+    const html = categorias
+        .filter(cat => categoriasConItems[cat.clave])
+        .map(cat => {
+            const catItems = items.filter(i => i.categoria === cat.clave);
 
-        const cuerpo = cat.clave === 'audio'
-            ? audioPorAnioHtml(catItems)
-            : `<div class="recursos-grid">${tarjetasDeItems(catItems, cat.clave)}</div>`;
+            const cuerpo = cat.clave === 'audio'
+                ? audioPorAnioHtml(catItems)
+                : `<div class="recursos-grid">${tarjetasDeItems(catItems, cat.clave)}</div>`;
 
-        return `
-            <div class="recursos-categoria" data-cat="${cat.clave}">
-                <h3>${cat.icono} ${cat.titulo}</h3>
-                ${cuerpo}
-            </div>
-        `;
-    }).join('');
+            return `
+                <div class="recursos-categoria" data-cat="${cat.clave}">
+                    <h3>${cat.icono} ${cat.titulo}</h3>
+                    ${cuerpo}
+                </div>
+            `;
+        }).join('');
 
     contenedor.innerHTML = filtros + html;
     seccion.style.display = 'block';
