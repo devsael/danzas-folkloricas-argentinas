@@ -4,10 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="robots" content="noindex">
-    <!-- cache-bust: 2025-08-24-2 -->
-    <title>Página no encontrada | Danzas Folklóricas Argentinas</title>
-<script>
-        // SPA fallback para GitHub Pages: redirige a la raíz preservando la ruta
+    <!-- cache-bust: 2025-08-24-3 -->
+    <title>Redirigiendo...</title>
+    <script>
+        // SPA fallback para GitHub Pages: redirige INMEDIATAMENTE al hash
         // para que el router del lado del cliente (pushState) pueda manejarla.
         (function() {
             var path = window.location.pathname;
@@ -15,39 +15,23 @@
             if (/\.(css|js|svg|png|jpg|jpeg|gif|webp|ico|woff|woff2|json|xml|txt)$/i.test(path)) {
                 return;
             }
-            // Redirige a la raíz con la ruta en el hash para que el router SPA la maneje.
+            // Redirige INMEDIATAMENTE al hash para que el router SPA la maneje.
             var redirectUrl = '/' + path.slice(1).replace(/\/$/, '') + (window.location.search || '');
-            window.location.href = '/' + '#' + redirectUrl;
+            window.location.replace('/#' + redirectUrl);
         })();
     </script>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Página no encontrada | Danzas Folklóricas Argentinas</title>
-    <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: Georgia, serif; background: #FEFBF7; color: #17130E; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 2rem; }
-        .container { max-width: 500px; text-align: center; padding: 2rem; background: #FEFBF7; border: 2px solid #E8DFD0; border-radius: 16px; box-shadow: 0 8px 24px rgba(0,0,0,0.08); }
-        .icon { font-size: 4rem; margin-bottom: 1rem; }
-        h1 { font-family: Georgia, serif; color: #8B6F47; margin-bottom: 1rem; font-size: 2rem; }
-        p { color: #8B6F47; margin-bottom: 1.5rem; line-height: 1.6; }
-        .btn { display: inline-block; background: #C1410C; color: #FEFBF7; padding: 0.8rem 2rem; border-radius: 8px; text-decoration: none; font-weight: bold; transition: background 0.2s; }
-        .btn:hover { background: #A0360C; }
-        .home-link { display: inline-block; margin-top: 1rem; color: #8B6F47; text-decoration: underline; }
-    </style>
+    <meta http-equiv="refresh" content="0;url=/">
+    <title>Redirigiendo...</title>
 </head>
 <body>
-    <div class="container">
-        <div class="icon">💃</div>
-        <h1>Página no encontrada</h1>
-        <p>Lo sentimos, la página que buscás no existe o se ha movido.</p>
-        <a href="/" class="btn">Volver al inicio</a>
-        <br>
-        <a href="/" class="home-link">← Volver a Danzas Folklóricas Argentinas</a>
-    </div>
     <script>
-        // Fallback: si el script del head no corrió (ej. JS deshabilitado), meta refresh
-        setTimeout(function() {
-            window.location.href = '/';
-        }, 5000);
+        // Fallback inmediato por si el script del head no corrió
+        (function() {
+            var path = window.location.pathname;
+            if (!/\.(css|js|svg|png|jpg|jpeg|gif|webp|ico|woff|woff2|json|xml|txt)$/i.test(path)) {
+                window.location.replace('/#' + window.location.pathname.slice(1) + (window.location.search || ''));
+            }
+        })();
     </script>
 </body>
 </html>
