@@ -1262,17 +1262,6 @@ section:nth-child(even) {
     background: #F5EFE6;
 }
 
-.recurso-stop-btn[data-playing="true"] {
-    background: var(--color-accent);
-    border-color: var(--color-accent);
-    color: #FEFBF7;
-}
-
-.recurso-stop-btn[data-playing="true"]:hover {
-    background: #B03A0C;
-    border-color: #B03A0C;
-}
-
 .recurso-button-donar {
     background: var(--color-primary);
     color: #FEFBF7;
